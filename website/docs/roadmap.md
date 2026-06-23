@@ -2,21 +2,22 @@
 
 Built **MVP-first**: one source end-to-end before widening. Each phase leaves a working, demoable system.
 
-## Phase 0 — Repo & tooling
-- [ ] Repo, `mise` (databricks CLI / terraform / python) + `uv` venv
-- [ ] Databricks Free Edition workspace; Unity Catalog + Delta schema
-- [ ] This documentation site live
+## Phase 0 — Repo & tooling ✅
+- [x] Repo, `mise` (databricks CLI / terraform / python) + `uv` venv
+- [x] This documentation site live (auto-deployed via GitHub Actions)
+- [ ] Databricks Free Edition workspace; Unity Catalog + Delta schema (deployment target)
 
-## Phase 1 — MVP vertical slice (FHIR end-to-end) ⭐
-- [ ] Synthea → FHIR NDJSON landed in bronze (Delta)
-- [ ] Mess-injector (schema drift, dupes, unit drift, missingness — deterministic seed)
-- [ ] PySpark bronze→silver: flatten Patient/Encounter/Condition/Observation; de-id; standardize LOINC/ICD-10
-- [ ] dbt silver→gold: `dim_patient`, `fct_observation`, one semantic-layer metric
-- [ ] dbt tests + Great Expectations on the silver gate
-- [ ] One Feast feature table
-- [ ] One pgvector index over synthetic clinical notes
-- [ ] One demo: adherence/surgery-risk model (MLflow) + a RAG query
-- [ ] Airflow DAG orchestrating the slice
+## Phase 1 — MVP vertical slice (FHIR end-to-end) ✅
+- [x] FHIR-shaped NDJSON landed in bronze (seeded synthetic generator)
+- [x] Mess-injector (schema drift, dupes, unit drift, missingness — deterministic seed)
+- [x] bronze→silver: flatten FHIR; de-id (PHI dropped + assertion); standardize LOINC/ICD-10, mmol/L→mg/dL
+- [x] dbt silver→gold: `dim_patient`, `fct_observation`, `mart_condition_outcomes` metric mart
+- [x] dbt tests on the silver/gold gate (8 tests passing)
+- [x] Feast feature table (600×8, offline Parquet + Feast repo)
+- [x] Vector index + RAG query over clinical notes (TF-IDF; pgvector is the prod target)
+- [x] Demo surgery-risk model (MLflow, ROC-AUC 0.825)
+- [x] Single end-to-end run (`make run`) + Airflow DAG mirroring it
+- See the [Results](results.md).
 
 ## Phase 2 — Widen sources + OMOP
 - [ ] Claims + PRO surveys + wearable batch; land OMOP CDM; expand marts & features
