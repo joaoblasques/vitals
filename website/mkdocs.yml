@@ -35,6 +35,10 @@ theme:
 nav:
   - Home: index.md
   - Architecture: architecture.md
+  - Concepts:
+      - Overview: concepts/index.md
+      - "Healthcare data: FHIR · PHI · OMOP": concepts/healthcare-data.md
+      - Glossary: concepts/glossary.md
   - Data Catalog & Lineage: catalog.md
   - Governance & Monitoring: governance.md
   - Roadmap: roadmap.md
