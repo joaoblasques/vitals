@@ -108,7 +108,27 @@ and surgery rate per condition.
 
 dbt now totals **1 seed + 10 models + 26 data tests, all passing**.
 
+## 8. Streaming + Spark at scale (Phase 3)
+
+Wearables arrive continuously in production, so they also run as a **Spark Structured Streaming**
+job — cleaning outliers on the fly and writing a checkpointed Parquet stream. The demo streams from
+a file source (no broker needed); **production swaps one line** to read from Kafka
+(`.readStream.format("kafka")`).
+
+| | |
+|---|---:|
+| Events streamed | 15,169 |
+| Outliers nulled in-stream | 448 |
+| Sink | checkpointed Parquet (`data/stream/cleaned`) |
+
+A **PySpark-at-scale** batch transform mirrors the silver logic on Spark — including a **window
+function** (7-observation rolling mean of pain per patient) — the way it runs on Databricks against
+Delta. (Spark 4 needs a JDK 17/21.)
+
+Run: `make spark-deps && make stream && make spark`.
+
 ---
 
 *Reproduce:* `make setup && make run` → writes `data/results.json`, the DuckDB lakehouse, and an
-MLflow run. See the [Dev Log](dev-log.md) for the build narrative.
+MLflow run. Phase 3 Spark jobs: `make spark-deps && make stream && make spark`. See the
+[Dev Log](dev-log.md) for the build narrative.

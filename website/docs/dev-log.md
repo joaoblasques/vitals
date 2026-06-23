@@ -2,6 +2,14 @@
 
 A running, dated log of what was built and what was learned — newest first.
 
+## 2026-06-23 — Phase 3: streaming + Spark at scale ✅
+- Wearables now also flow through a **Spark Structured Streaming** job: file source → cleaned
+  Parquet sink with checkpointing, `trigger(availableNow)`. 15,169 events streamed, **448 outliers
+  nulled on the fly**. Production swaps the source to **Kafka** — one line, identical downstream.
+- Added a **PySpark-at-scale** batch transform with a **window function** (7-obs rolling pain per
+  patient) — the Databricks scale path for the silver logic (1,631 rows).
+- Infra note: Spark 4 needs JDK 17/21 (not 24); the modules auto-select an installed 17/21 JDK.
+
 ## 2026-06-23 — Phase 2: multi-source ingestion ✅
 - Added three source types through bronze→silver→dbt gold: **claims** (837/835-style, 1,510),
   **PRO surveys** (Oswestry Disability Index, 1,718), **wearables** (daily batch, 15,169).

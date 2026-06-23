@@ -24,8 +24,9 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] Add claims (837/835) + PRO surveys + wearable batch as sources (cleaned at silver)
 - [x] Expand marts & features — `mart_cost_outcomes`; 20-feature store across 4 sources
 
-## Phase 3 — Streaming + scale
-- [ ] Kafka → Spark Structured Streaming for wearable sensors; PySpark-at-scale pass
+## Phase 3 — Streaming + scale ✅
+- [x] Wearable stream via **Spark Structured Streaming** (file-source demo, checkpointed sink; Kafka in prod)
+- [x] **PySpark-at-scale** transform with a window function (7-obs rolling pain per patient)
 
 ## Phase 4 — Governance & polish
 - [ ] Lineage + data dictionary + Unity Catalog governance; drift monitoring; decision write-ups
