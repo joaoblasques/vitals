@@ -28,5 +28,11 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] Wearable stream via **Spark Structured Streaming** (file-source demo, checkpointed sink; Kafka in prod)
 - [x] **PySpark-at-scale** transform with a window function (7-obs rolling pain per patient)
 
-## Phase 4 — Governance & polish
+## Phase 4 — Governance & polish ✅
+- [x] Lineage + data dictionary auto-generated from dbt → [Data Catalog](catalog.md)
+- [x] Governance model (PHI classification, de-id boundary, Unity Catalog mapping) → [Governance](governance.md)
+- [x] Drift monitoring (PSI) on the feature store
+- [x] Decision records (ADRs) in repo `docs/adr/` + vault
+
+### Original Phase 4 checklist
 - [ ] Lineage + data dictionary + Unity Catalog governance; drift monitoring; decision write-ups

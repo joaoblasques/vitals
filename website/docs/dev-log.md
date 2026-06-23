@@ -2,6 +2,16 @@
 
 A running, dated log of what was built and what was learned — newest first.
 
+## 2026-06-23 — Phase 4: governance & polish ✅
+- **Drift monitoring** (`monitoring.py`): PSI per feature, reference vs current. Stable on a natural
+  split; correctly **flags an injected population shift** (pain/ODI/activity → significant).
+- **Auto-generated data dictionary + lineage** (`catalog.py`) from dbt's manifest/catalog — a
+  Mermaid lineage graph (10 models, 17 edges) + per-column dictionary that can't drift from the code.
+- **Governance page**: PHI classification, the silver de-id boundary, and the Unity Catalog
+  production mapping.
+- **ADRs** (`docs/adr/`) for the four non-obvious decisions (DuckDB-vs-Databricks, de-id, OMOP,
+  three-store gold); summarized in the vault.
+
 ## 2026-06-23 — Phase 3: streaming + Spark at scale ✅
 - Wearables now also flow through a **Spark Structured Streaming** job: file source → cleaned
   Parquet sink with checkpointing, `trigger(availableNow)`. 15,169 events streamed, **448 outliers
