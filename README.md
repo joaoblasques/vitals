@@ -6,8 +6,8 @@ A governed **medallion lakehouse** that ingests messy, multi-source health data 
 three trusted outputs: **analytics marts**, an **ML feature store**, and a **vector index** for
 retrieval — built on Databricks/Delta with dbt, Airflow, and PySpark.
 
-> 🌐 **Website / docs:** https://joaoblasques.github.io/vitals/
-> 📋 Status: **in active development** — see the [Roadmap](https://joaoblasques.github.io/vitals/roadmap/).
+> 🌐 **Website / docs:** https://joaoblasques.com/vitals/
+> 📋 Status: **in active development** — see the [Roadmap](https://joaoblasques.com/vitals/roadmap/).
 
 ---
 
@@ -70,7 +70,7 @@ docs/        concept & decision docs
 ## Status & roadmap
 
 This is a portfolio project under active construction. The plan is public and tracked on the
-[Roadmap](https://joaoblasques.github.io/vitals/roadmap/) — built MVP-first (one source end-to-end
+[Roadmap](https://joaoblasques.com/vitals/roadmap/) — built MVP-first (one source end-to-end
 before widening).
 
 ## License
