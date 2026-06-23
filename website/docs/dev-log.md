@@ -2,6 +2,14 @@
 
 A running, dated log of what was built and what was learned — newest first.
 
+## 2026-06-23 — Phase 2 begins: OMOP CDM ✅
+- Conformed silver into the **OMOP Common Data Model** in dbt: `omop_person`,
+  `omop_condition_occurrence`, `omop_measurement` (600 / 600 / 5,303 rows).
+- Source codes mapped to standard concepts via a dbt seed (`concept_map.csv`): ICD-10 → condition
+  concepts, LOINC → measurement concepts, gender → 8507/8532. Referential integrity tested.
+- dbt now: **1 seed + 6 models + 18 tests, all passing.**
+- Next: widen sources (claims 837/835, PRO surveys, wearable batch) and expand features.
+
 ## 2026-06-23 — Phase 1 MVP slice: working end-to-end ✅
 - Built the full vertical slice: **generate → bronze → silver → dbt gold → serve**, runnable with
   one command (`make run`). See [Results](results.md) for the real numbers.

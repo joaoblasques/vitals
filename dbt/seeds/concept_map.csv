@@ -1,0 +1,9 @@
+source_vocabulary,source_code,target_concept_id,target_name,domain
+ICD10,M54.5,194133,Low back pain,Condition
+ICD10,M17.0,80180,Osteoarthritis of knee,Condition
+ICD10,M75.100,4006969,Rotator cuff syndrome,Condition
+ICD10,M51.26,4148736,Lumbar disc displacement,Condition
+ICD10,M25.561,4150125,Pain in knee,Condition
+LOINC,2339-0,3004501,Glucose [Mass/volume] in Serum or Plasma,Measurement
+LOINC,8867-4,3027018,Heart rate,Measurement
+LOINC,38208-5,3035811,Pain severity score,Measurement

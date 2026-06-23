@@ -60,6 +60,20 @@ Logistic regression on the feature store, predicting `surgery_within_90d`:
 The learned coefficients are clinically coherent — **mean pain (+1.11)** and **age (+0.85)** raise
 risk, while **adherence (−0.62)** lowers it — exactly the relationship Sword's care model is built on.
 
+## 6. OMOP CDM (Phase 2)
+
+Silver is also conformed to the **OMOP Common Data Model** — the standard health-data analysts and
+researchers recognize — in dbt, with source codes mapped to standard concepts:
+
+| OMOP table | Rows | Notes |
+|---|---:|---|
+| `omop_person` | 600 | standard gender concepts (8507 / 8532) |
+| `omop_condition_occurrence` | 600 | ICD-10 → standard condition concept (e.g. M54.5 → 194133 "Low back pain") |
+| `omop_measurement` | 5,303 | LOINC → standard measurement concept (e.g. 2339-0 → 3004501 "Glucose") |
+
+The concept mapping is a dbt seed (illustrative concept IDs); in production it's loaded from the
+full OHDSI Athena vocabulary. Referential integrity (`person_id` FKs) is enforced by dbt tests.
+
 ---
 
 *Reproduce:* `make setup && make run` → writes `data/results.json`, the DuckDB lakehouse, and an

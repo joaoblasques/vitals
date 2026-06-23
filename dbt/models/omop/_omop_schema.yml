@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: omop_person
+    description: OMOP CDM PERSON — de-identified, standard gender concepts.
+    columns:
+      - name: person_id
+        tests: [unique, not_null]
+      - name: gender_concept_id
+        tests:
+          - accepted_values: {values: [8507, 8532, 0]}
+  - name: omop_condition_occurrence
+    description: OMOP CDM CONDITION_OCCURRENCE — ICD-10 mapped to standard concepts.
+    columns:
+      - name: condition_occurrence_id
+        tests: [unique, not_null]
+      - name: person_id
+        tests:
+          - relationships: {to: ref('omop_person'), field: person_id}
+  - name: omop_measurement
+    description: OMOP CDM MEASUREMENT — LOINC observations mapped to standard concepts.
+    columns:
+      - name: measurement_id
+        tests: [unique, not_null]
+      - name: measurement_concept_id
+        tests: [not_null]
+      - name: person_id
+        tests:
+          - relationships: {to: ref('omop_person'), field: person_id}

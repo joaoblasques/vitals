@@ -2,6 +2,7 @@
 select
     patient_key,
     obs_date,
+    loinc_code,
     metric,
     value_std,
     unit_std

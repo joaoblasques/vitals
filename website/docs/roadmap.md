@@ -19,8 +19,10 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] Single end-to-end run (`make run`) + Airflow DAG mirroring it
 - See the [Results](results.md).
 
-## Phase 2 — Widen sources + OMOP
-- [ ] Claims + PRO surveys + wearable batch; land OMOP CDM; expand marts & features
+## Phase 2 — Widen sources + OMOP (in progress)
+- [x] Land the **OMOP CDM** (person, condition_occurrence, measurement) with concept mapping + tests
+- [ ] Add claims (837/835) + PRO surveys + wearable batch as sources
+- [ ] Expand marts & features from the new sources
 
 ## Phase 3 — Streaming + scale
 - [ ] Kafka → Spark Structured Streaming for wearable sensors; PySpark-at-scale pass

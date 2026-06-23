@@ -27,3 +27,8 @@ website/site/
 
 # OS
 .DS_Store
+
+# generated artifacts
+mlflow.db
+mlruns/
+dbt/.user.yml
