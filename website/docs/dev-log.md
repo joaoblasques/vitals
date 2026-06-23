@@ -2,6 +2,18 @@
 
 A running, dated log of what was built and what was learned — newest first.
 
+## 2026-06-23 — Phase 2: multi-source ingestion ✅
+- Added three source types through bronze→silver→dbt gold: **claims** (837/835-style, 1,510),
+  **PRO surveys** (Oswestry Disability Index, 1,718), **wearables** (daily batch, 15,169).
+- Each with its own injected mess + silver fix: billed-as-string → numeric (96% recovered),
+  out-of-range ODI clamped (0 remaining), outlier step counts nulled (0 remaining).
+- New dbt models: `fct_claim`, `fct_pro`, `fct_wearable_daily`, and `mart_cost_outcomes` (a
+  value-based-care view: conservative spend, imaging rate, surgery rate per condition).
+- **Leakage guard:** claims contain only conservative-care CPTs (office, MRI, PT, injection) — no
+  surgery codes — so they predict the future outcome without leaking it.
+- Feature store grew to **20 features across 4 sources**; demo model uses a curated 10
+  (feature selection). dbt now **1 seed + 10 models + 26 tests, all passing**.
+
 ## 2026-06-23 — Phase 2 begins: OMOP CDM ✅
 - Conformed silver into the **OMOP Common Data Model** in dbt: `omop_person`,
   `omop_condition_occurrence`, `omop_measurement` (600 / 600 / 5,303 rows).

@@ -10,3 +10,6 @@ sources:
       - name: condition
       - name: target
       - name: note
+      - name: claim
+      - name: pro
+      - name: wearable_daily

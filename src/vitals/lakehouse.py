@@ -44,7 +44,8 @@ def build() -> dict:
     con.execute("CREATE SCHEMA IF NOT EXISTS bronze; CREATE SCHEMA IF NOT EXISTS silver;")
 
     # ---- BRONZE: load raw NDJSON (union_by_name absorbs schema drift) ----
-    for name in ["patients", "encounters", "conditions", "observations", "notes"]:
+    for name in ["patients", "encounters", "conditions", "observations", "notes",
+                 "claims", "pro_surveys", "wearables"]:
         con.execute(
             f"""CREATE OR REPLACE TABLE bronze.{name} AS
                 SELECT * FROM read_json('{BRONZE/f'{name}.ndjson'}',
@@ -129,6 +130,44 @@ def build() -> dict:
            FROM bronze.notes WHERE text IS NOT NULL"""
     )
 
+    # ---- SILVER: claim (cast string-billed → double, flag denials, date-shift) ----
+    con.execute(
+        """CREATE OR REPLACE TABLE silver.claim AS
+           SELECT md5(replace(c.patient.reference,'Patient/','')) AS patient_key,
+                  (CAST(c.billablePeriod.start AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS claim_date,
+                  c.procedure[1].code    AS procedure_code,
+                  c.procedure[1].display AS procedure_display,
+                  c.diagnosis[1].code    AS dx_code,
+                  TRY_CAST(CAST(c.total.value AS VARCHAR) AS DOUBLE) AS billed,
+                  c.paid                 AS paid,
+                  c.status               AS status,
+                  (c.status = 'denied')  AS denied
+           FROM bronze.claims c
+           JOIN silver.patient p ON p.patient_key = md5(replace(c.patient.reference,'Patient/',''))"""
+    )
+
+    # ---- SILVER: PRO surveys (clamp out-of-range ODI to NULL) ----
+    con.execute(
+        """CREATE OR REPLACE TABLE silver.pro AS
+           SELECT md5(replace(j.subject.reference,'Patient/','')) AS patient_key,
+                  (CAST(j.authored AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS survey_date,
+                  j.instrument,
+                  CASE WHEN j.score BETWEEN 0 AND 100 THEN j.score ELSE NULL END AS score
+           FROM bronze.pro_surveys j
+           JOIN silver.patient p ON p.patient_key = md5(replace(j.subject.reference,'Patient/',''))"""
+    )
+
+    # ---- SILVER: wearable daily (null-out outlier step counts) ----
+    con.execute(
+        """CREATE OR REPLACE TABLE silver.wearable_daily AS
+           SELECT md5(replace(w.patient.reference,'Patient/','')) AS patient_key,
+                  (CAST(w.date AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS day,
+                  CASE WHEN w.steps BETWEEN 0 AND 50000 THEN w.steps ELSE NULL END AS steps,
+                  w.active_minutes, w.resting_hr, w.sleep_hours
+           FROM bronze.wearables w
+           JOIN silver.patient p ON p.patient_key = md5(replace(w.patient.reference,'Patient/',''))"""
+    )
+
     dq_after = _dq_silver(con)
     report = {"bronze_before": dq_before, "silver_after": dq_after}
     DQ_OUT.write_text(json.dumps(report, indent=2))
@@ -155,6 +194,9 @@ def _dq_bronze(con) -> dict:
         "glucose_distinct_units": _scalar(con, "SELECT count(DISTINCT COALESCE(valueQuantity.unit, unit)) FROM bronze.observations WHERE code.coding[1].code='2339-0'"),
         "freetext_condition_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN code.coding IS NULL THEN 1 ELSE 0 END) FROM bronze.conditions"), 1),
         "obs_missing_value_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN COALESCE(valueQuantity.value, value) IS NULL THEN 1 ELSE 0 END) FROM bronze.observations"), 1),
+        "claims_missing_paid_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN paid IS NULL THEN 1 ELSE 0 END) FROM bronze.claims"), 1),
+        "wearable_outlier_steps_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN steps > 50000 THEN 1 ELSE 0 END) FROM bronze.wearables"), 1),
+        "pro_out_of_range_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN score > 100 THEN 1 ELSE 0 END) FROM bronze.pro_surveys"), 1),
     }
 
 
@@ -166,6 +208,10 @@ def _dq_silver(con) -> dict:
         "condition_coded_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN icd10_code IS NOT NULL THEN 1 ELSE 0 END) FROM silver.condition"), 1),
         "conditions_recovered_from_text": _scalar(con, "SELECT count(*) FROM silver.condition WHERE recovered_from_text"),
         "obs_missing_value_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN value_std IS NULL THEN 1 ELSE 0 END) FROM silver.observation"), 1),
+        "claim_rows": _scalar(con, "SELECT count(*) FROM silver.claim"),
+        "claims_billed_numeric_pct": round(_scalar(con, "SELECT 100.0*avg(CASE WHEN billed IS NOT NULL THEN 1 ELSE 0 END) FROM silver.claim"), 1),
+        "wearable_outlier_steps_remaining": _scalar(con, "SELECT count(*) FROM silver.wearable_daily WHERE steps > 50000"),
+        "pro_out_of_range_remaining": _scalar(con, "SELECT count(*) FROM silver.pro WHERE score > 100"),
     }
 
 

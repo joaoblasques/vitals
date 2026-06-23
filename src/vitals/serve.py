@@ -19,7 +19,7 @@ GOLD = ROOT / "data" / "gold"
 RESULTS = ROOT / "data" / "results.json"
 
 FEATURE_SQL = """
-with agg as (
+with obs as (
     select patient_key,
         count(*)                                                      as n_observations,
         avg(value_std) filter (where metric='pain')                  as mean_pain,
@@ -30,14 +30,40 @@ with agg as (
         avg(value_std) filter (where metric='glucose')               as mean_glucose_mgdl,
         avg(value_std) filter (where metric='heart_rate')            as mean_hr
     from gold.fct_observation group by 1
+),
+clm as (   -- claims-derived features (conservative-care history)
+    select patient_key,
+        count(*)                                                      as n_claims,
+        sum(coalesce(paid, 0))                                        as total_paid,
+        max(case when procedure_code in ('72148','73721') then 1 else 0 end) as had_imaging,
+        avg(case when denied then 1.0 else 0.0 end)                   as denial_rate
+    from gold.fct_claim group by 1
+),
+pro as (   -- patient-reported outcome (ODI) features
+    select patient_key, avg(score) as mean_odi,
+           arg_max(score, survey_date) as latest_odi
+    from gold.fct_pro group by 1
+),
+wbl as (   -- wearable activity features
+    select patient_key, avg(steps) as mean_steps, avg(active_minutes) as mean_active_min,
+           avg(resting_hr) as mean_wearable_hr, avg(sleep_hours) as mean_sleep
+    from gold.fct_wearable_daily group by 1
 )
 select d.patient_key, d.age,
        case when d.gender='male' then 1 when d.gender='female' then 0 else null end as gender_male,
        d.primary_condition_code,
-       a.n_observations, a.mean_pain, a.last_pain, a.pain_trend,
-       a.mean_adherence, a.mean_glucose_mgdl, a.mean_hr,
+       o.n_observations, o.mean_pain, o.last_pain, o.pain_trend,
+       o.mean_adherence, o.mean_glucose_mgdl, o.mean_hr,
+       coalesce(clm.n_claims, 0) as n_claims, coalesce(clm.total_paid, 0) as total_paid,
+       coalesce(clm.had_imaging, 0) as had_imaging, coalesce(clm.denial_rate, 0) as denial_rate,
+       pro.mean_odi, pro.latest_odi,
+       wbl.mean_steps, wbl.mean_active_min, wbl.mean_wearable_hr, wbl.mean_sleep,
        d.surgery_90d
-from gold.dim_patient d join agg a using (patient_key)
+from gold.dim_patient d
+join obs o using (patient_key)
+left join clm using (patient_key)
+left join pro using (patient_key)
+left join wbl using (patient_key)
 """
 
 
@@ -110,8 +136,10 @@ def _train_model(feats: pd.DataFrame) -> dict:
     from sklearn.impute import SimpleImputer
     from sklearn.preprocessing import StandardScaler
 
-    feat_cols = ["age", "gender_male", "n_observations", "mean_pain", "last_pain",
-                 "pain_trend", "mean_adherence", "mean_glucose_mgdl", "mean_hr"]
+    # The feature store holds all 19 features; the demo model uses a curated, clinically-relevant
+    # subset (feature selection) — the rest (glucose, HR, sleep, billing) are noise vs this outcome.
+    feat_cols = ["age", "mean_pain", "last_pain", "pain_trend", "mean_adherence",
+                 "mean_odi", "latest_odi", "mean_active_min", "mean_steps", "had_imaging"]
     X = feats[feat_cols]
     y = feats["surgery_90d"].astype(int)
     Xtr, Xte, ytr, yte = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)

@@ -35,8 +35,15 @@ dbt build: **3 models + 8 data tests, all passing** (uniqueness, not-null, accep
 
 ## 3. Feature store — `gold.patient_features`
 
-600 patients × time-aware features (offline table + Parquet; Feast repo in `ml/feature_store/`):
-`age, mean_pain, last_pain, pain_trend, mean_adherence, mean_glucose_mgdl, mean_hr, n_observations`.
+600 patients × **20 time-aware features spanning four source types** (offline table + Parquet;
+Feast repo in `ml/feature_store/`):
+
+- **observations** — mean/last/trend pain, adherence, glucose, heart rate
+- **claims** — claim count, conservative-care spend, had-imaging, denial rate
+- **PRO** — Oswestry Disability Index (mean + latest)
+- **wearables** — mean steps, active minutes, resting HR, sleep
+
+The store holds all 20; the demo model below uses a curated, clinically-relevant subset (feature selection).
 
 ## 4. Vector index + RAG
 
@@ -48,17 +55,19 @@ dbt build: **3 models + 8 data tests, all passing** (uniqueness, not-null, accep
 
 ## 5. Demo model — surgery-risk (tracked in MLflow)
 
-Logistic regression on the feature store, predicting `surgery_within_90d`:
+Logistic regression on a curated 10-feature subset of the store, predicting `surgery_within_90d`:
 
 | Metric | Value |
 |---|---|
-| ROC-AUC | **0.825** |
-| Accuracy | 0.847 |
+| ROC-AUC | **0.748** |
+| Accuracy | 0.84 |
 | Train / test | 450 / 150 |
-| Positive rate | 17.5% |
+| Model features | 10 (curated from 20) |
 
-The learned coefficients are clinically coherent — **mean pain (+1.11)** and **age (+0.85)** raise
-risk, while **adherence (−0.62)** lowers it — exactly the relationship Sword's care model is built on.
+The learned coefficients are clinically coherent — **disability (ODI +0.72)**, **age (+0.64)**, and
+**pain** raise risk, while **activity (active minutes −0.74, steps)** lowers it — exactly the
+relationship Sword's care model is built on. Multi-source features (claims imaging, ODI, wearables)
+now sit among the top predictors.
 
 ## 6. OMOP CDM (Phase 2)
 
@@ -73,6 +82,31 @@ researchers recognize — in dbt, with source codes mapped to standard concepts:
 
 The concept mapping is a dbt seed (illustrative concept IDs); in production it's loaded from the
 full OHDSI Athena vocabulary. Referential integrity (`person_id` FKs) is enforced by dbt tests.
+
+## 7. Multi-source ingestion (Phase 2)
+
+Three more source types now flow through bronze → silver → dbt gold, each cleaned at the silver gate:
+
+| Source | Bronze mess | Silver fix |
+|---|---|---|
+| **Claims** (837/835-style, 1,510 rows) | 9.7% missing paid; ~5% billed as string | string→numeric (96% recovered); denials flagged |
+| **PRO surveys** (ODI, 1,718 rows) | 1.9% scores out of range (>100) | clamped → **0 remaining** |
+| **Wearables** (daily batch, 15,169 rows) | 3.0% outlier step counts | nulled → **0 remaining** |
+
+### Cost mart — `gold.mart_cost_outcomes`
+
+A value-based-care view (the kind Sword reports to payers): conservative-care spend, imaging rate,
+and surgery rate per condition.
+
+| Condition | Patients | Surgery rate | Avg conservative spend | Imaging rate |
+|---|---:|---:|---:|---:|
+| Lumbar disc displacement | 129 | 0.341 | $1,004 | 70.5% |
+| Low back pain | 115 | 0.035 | $890 | 59.1% |
+| Pain in right knee | 116 | 0.017 | $816 | 60.3% |
+| Knee osteoarthritis (bilateral) | 124 | 0.282 | $784 | 54.0% |
+| Rotator cuff tear | 116 | 0.052 | $729 | 62.1% |
+
+dbt now totals **1 seed + 10 models + 26 data tests, all passing**.
 
 ---
 

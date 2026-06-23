@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: fct_claim
+    description: Conservative-care claim fact (leakage-free).
+    columns:
+      - name: patient_key
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_patient'), field: patient_key}
+  - name: fct_pro
+    description: Oswestry Disability Index over time.
+    columns:
+      - name: score
+        tests: [not_null]
+      - name: patient_key
+        tests:
+          - relationships: {to: ref('dim_patient'), field: patient_key}
+  - name: fct_wearable_daily
+    description: Cleaned wearable daily series.
+    columns:
+      - name: patient_key
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_patient'), field: patient_key}
+  - name: mart_cost_outcomes
+    description: Per-condition conservative-care spend, imaging rate, surgery rate.
+    columns:
+      - name: primary_condition
+        tests: [not_null, unique]

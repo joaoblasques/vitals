@@ -49,6 +49,17 @@ SITE = ["lower back", "knee", "shoulder", "hip"]
 AGG = ["prolonged sitting", "stair climbing", "lifting", "overhead reaching"]
 ADH = ["good", "partial", "poor"]
 
+# CPT procedures — CONSERVATIVE care only (office, imaging, PT, injection). No surgery
+# codes here on purpose: surgery_90d is the future outcome, so this stays leakage-free.
+CPT = [
+    ("99213", 120, "Office/outpatient visit"),
+    ("72148", 1100, "MRI lumbar spine"),
+    ("73721", 1200, "MRI knee"),
+    ("97110", 90, "Therapeutic exercise (PT)"),
+    ("20610", 250, "Joint injection"),
+]
+CPT_WEIGHTS = [5, 2, 2, 6, 2]
+
 
 @dataclass
 class Counter:
@@ -69,6 +80,7 @@ def generate() -> dict[str, int]:
     ids = Counter()
 
     patients, encounters, conditions, observations, notes = [], [], [], [], []
+    claims, pros, wearables = [], [], []
 
     for _ in range(N_PATIENTS):
         pid = ids.nxt("pat")
@@ -155,6 +167,61 @@ def generate() -> dict[str, int]:
             ),
         })
 
+        # --- Claims (conservative-care history → legit predictors, no surgery CPTs = no leakage) ---
+        # Imaging likelihood rises with pain severity (sicker patients get more MRIs) — realistic
+        # and makes `had_imaging` a genuine predictor rather than noise.
+        cpt_w = [5, 1 + base_pain * 0.7, 1 + base_pain * 0.7, 6, 2]
+        for _ in range(rng.randint(0, 5)):
+            cd = date(2025, rng.randint(1, 11), rng.randint(1, 28))
+            code, base, disp = rng.choices(CPT, weights=cpt_w)[0]
+            billed = _round(base * rng.uniform(0.8, 1.4), 2)
+            denied = rng.random() < 0.12
+            claim = {
+                "resourceType": "Claim", "id": ids.nxt("clm"), "patient": {"reference": f"Patient/{pid}"},
+                "billablePeriod": {"start": cd.isoformat()},
+                "procedure": [{"code": code, "display": disp}],
+                "diagnosis": [{"code": cond[0]}],
+                "total": {"value": billed},
+                "status": "denied" if denied else "active",
+                "paid": 0.0 if denied else _round(billed * rng.uniform(0.5, 0.85), 2),
+            }
+            if rng.random() < 0.10:
+                claim.pop("paid", None)                  # missing adjudication (the mess)
+            if rng.random() < 0.05:
+                claim["total"] = {"value": str(billed)}  # billed as string (type mess)
+            claims.append(claim)
+
+        # --- PRO surveys (Oswestry Disability Index, 0-100; higher = worse) ---
+        for ed in enc_dates:
+            odi = max(0, min(100, round(base_pain * 8 + (1 - adherence) * 25 + rng.gauss(0, 6))))
+            pro = {
+                "resourceType": "QuestionnaireResponse", "id": ids.nxt("pro"),
+                "subject": {"reference": f"Patient/{pid}"}, "authored": ed.isoformat(),
+                "instrument": "ODI", "score": odi,
+            }
+            if rng.random() < 0.04:
+                pro.pop("score", None)                   # missing score
+            elif rng.random() < 0.02:
+                pro["score"] = odi + 100                 # out-of-range typo
+            pros.append(pro)
+
+        # --- Wearable daily batch (30 days; gaps + outliers) ---
+        base_steps = int(3000 + adherence * 6000 - base_pain * 200)
+        for k in range(30):
+            if rng.random() < 0.15:
+                continue                                  # missing day (gap)
+            wd = date(2025, 9, 1) + timedelta(days=k)
+            steps = max(0, int(rng.gauss(base_steps, 1500)))
+            if rng.random() < 0.03:
+                steps = rng.randint(80000, 200000)        # outlier
+            wearables.append({
+                "type": "wearable_daily", "id": ids.nxt("wbl"), "patient": {"reference": f"Patient/{pid}"},
+                "date": wd.isoformat(), "steps": steps,
+                "active_minutes": max(0, int(rng.gauss(20 + adherence * 40, 12))),
+                "resting_hr": int(rng.gauss(68, 7)),
+                "sleep_hours": None if rng.random() < 0.05 else _round(rng.uniform(5.0, 8.5), 1),
+            })
+
         # mess: ~5% duplicate the patient + their condition (exact dupes)
         if rng.random() < 0.05:
             patients.append(dict(patient))
@@ -164,9 +231,13 @@ def generate() -> dict[str, int]:
     _write("conditions", conditions)
     _write("observations", observations)
     _write("notes", notes)
+    _write("claims", claims)
+    _write("pro_surveys", pros)
+    _write("wearables", wearables)
 
     counts = {"patients": len(patients), "encounters": len(encounters), "conditions": len(conditions),
-              "observations": len(observations), "notes": len(notes)}
+              "observations": len(observations), "notes": len(notes), "claims": len(claims),
+              "pro_surveys": len(pros), "wearables": len(wearables)}
     print("bronze generated:", counts)
     return counts
 
