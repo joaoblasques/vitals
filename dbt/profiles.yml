@@ -1,0 +1,8 @@
+vitals:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/vitals.duckdb
+      schema: gold
+      threads: 4

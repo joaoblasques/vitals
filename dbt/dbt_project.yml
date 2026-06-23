@@ -1,0 +1,12 @@
+name: vitals
+version: "0.0.1"
+config-version: 2
+profile: vitals
+
+model-paths: ["models"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  vitals:
+    +materialized: table

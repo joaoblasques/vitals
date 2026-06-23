@@ -1,0 +1,11 @@
+# Feast feature store config (local). The offline store is the gold feature parquet
+# produced by `python -m vitals.serve`; in production this points at Databricks/Delta.
+project: vitals
+provider: local
+registry: registry.db
+online_store:
+  type: sqlite
+  path: online_store.db
+offline_store:
+  type: file
+entity_key_serialization_version: 2

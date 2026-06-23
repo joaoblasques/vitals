@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: dim_patient
+    description: Conformed patient dimension (de-identified) with primary condition + target.
+    columns:
+      - name: patient_key
+        tests: [unique, not_null]
+      - name: surgery_90d
+        tests:
+          - accepted_values: {values: [0, 1]}
+  - name: fct_observation
+    description: Standardized observation fact.
+    columns:
+      - name: patient_key
+        tests:
+          - not_null
+          - relationships: {to: ref('dim_patient'), field: patient_key}
+      - name: metric
+        tests:
+          - accepted_values: {values: ['pain', 'adherence', 'heart_rate', 'glucose', 'other']}
+      - name: unit_std
+        tests: [not_null]
+  - name: mart_condition_outcomes
+    description: Per-condition analytics mart with surgery-rate / pain / adherence metrics.
+    columns:
+      - name: primary_condition
+        tests: [not_null]

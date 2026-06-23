@@ -67,6 +67,22 @@ website/     MkDocs Material site (the public docs)
 docs/        concept & decision docs
 ```
 
+## Quickstart
+
+Runs end-to-end locally on DuckDB — no cloud or Java needed:
+
+```bash
+make setup     # uv venv + install the runnable stack
+make run       # generate → bronze → silver → dbt gold → features + vectors + model
+```
+
+Outputs: a DuckDB lakehouse (`data/vitals.duckdb`, schemas `bronze`/`silver`/`gold`), a
+data-quality report (`data/dq_report.json`), a feature Parquet, an MLflow run, and
+`data/results.json`. See the [Results](https://joaoblasques.com/vitals/results/) for what it produces.
+
+> **Why DuckDB?** The MVP is built to *run* in one command. **Databricks/Delta** is the documented
+> deployment target and **PySpark** the Phase-3 scale path (`pip install -e '.[databricks]'`).
+
 ## Status & roadmap
 
 This is a portfolio project under active construction. The plan is public and tracked on the

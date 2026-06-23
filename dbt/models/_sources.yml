@@ -1,0 +1,12 @@
+version: 2
+
+sources:
+  - name: silver
+    description: De-identified, conformed clean layer built by the bronze→silver pipeline.
+    schema: silver
+    tables:
+      - name: patient
+      - name: observation
+      - name: condition
+      - name: target
+      - name: note
