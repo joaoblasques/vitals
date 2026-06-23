@@ -1,0 +1,10 @@
+# Project-level tool versions for Vitals. `mise install` to set up.
+[tools]
+python = "3.12"
+uv = "latest"
+terraform = "latest"
+"npm:@databricks/cli" = "latest"
+
+[env]
+# uv-managed venv lives in .venv
+UV_PROJECT_ENVIRONMENT = ".venv"

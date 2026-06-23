@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+.pytest_cache/
+.ruff_cache/
+
+# Data (synthetic, regenerated locally — never commit)
+data/
+*.ndjson
+*.parquet
+*.duckdb
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+
+# MkDocs build output
+website/site/
+
+# Secrets / local config
+.env
+*.local
+.databrickscfg
+
+# OS
+.DS_Store
