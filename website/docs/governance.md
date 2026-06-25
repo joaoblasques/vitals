@@ -21,7 +21,7 @@ pipeline if any PHI column survives into silver.
 |---|---|
 | de-id assertion in the pipeline | Unity Catalog column masks + row filters |
 | `patient_key` hashing | UC governed surrogate + access policies |
-| schema separation `bronze`/`silver`/`gold` | UC catalogs/schemas with grants per tier |
+| schema separation `bronze`/`silver`/`gold` | UC catalogs/schemas with grants per tier (provisioned by `infra/terraform/`) |
 
 ## Lineage & data dictionary
 
