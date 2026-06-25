@@ -1,18 +1,23 @@
 # Catalog-per-medallion-layer. The PHI boundary is a catalog boundary:
 # bronze carries identifiers (gated); silver and downstream are de-identified.
-# On Free Edition these are managed catalogs backed by the metastore's default storage.
+#
+# Free Edition (Default Storage) BLOCKS catalog creation via API/CLI/Terraform:
+#   "Please use the UI to create a catalog with Default Storage."
+# (databricks/cli#4513, closed not-planned). So the three catalog *shells* are created once,
+# by hand, in the UI (Catalog Explorer -> Create catalog -> Default Storage) — the documented
+# "manual GUI is the last resort" escape hatch. Terraform CONSUMES them here as data sources
+# and manages everything *inside* them (schemas, the landing volume, the PHI-gating grants).
+# A missing catalog fails the plan with a clear "not found", prompting the one-time UI step.
+# See README "Prerequisite: create the catalog shells in the UI".
 
-resource "databricks_catalog" "bronze" {
-  name    = "${var.catalog_prefix}_bronze"
-  comment = "Raw, messy, PHI-bearing ingest (FHIR/claims/wearable/PRO/notes). Gated tier."
+data "databricks_catalog" "bronze" {
+  name = "${var.catalog_prefix}_bronze"
 }
 
-resource "databricks_catalog" "silver" {
-  name    = "${var.catalog_prefix}_silver"
-  comment = "De-identified (HIPAA Safe Harbor + date-shift), conformed, OMOP CDM. PHI boundary crossed here."
+data "databricks_catalog" "silver" {
+  name = "${var.catalog_prefix}_silver"
 }
 
-resource "databricks_catalog" "gold" {
-  name    = "${var.catalog_prefix}_gold"
-  comment = "Consumption: analytics marts, feature store, vector index, drift monitoring."
+data "databricks_catalog" "gold" {
+  name = "${var.catalog_prefix}_gold"
 }

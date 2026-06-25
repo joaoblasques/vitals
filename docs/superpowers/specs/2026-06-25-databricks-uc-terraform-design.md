@@ -102,3 +102,25 @@ infra/terraform/
 - Account-level UC (metastore, storage credentials, external locations) — not available and not
   needed on Free Edition.
 - Compute (serverless is implicit on Free Edition; no cluster/warehouse Terraform).
+
+## Addendum — what the first real `apply` revealed (2026-06-26)
+
+Applied against a live Free Edition workspace. Two design assumptions were **falsified** and the
+module was revised (still reproducible-from-code, just hybrid):
+
+1. **"Managed catalogs need no storage_root on Free Edition" → false.** With Default Storage
+   enabled, `CREATE CATALOG` via API/CLI/Terraform is hard-blocked: *"Please use the UI to create a
+   catalog with Default Storage"* (databricks/cli#4513, not-planned). **Fix:** the 3 catalog shells
+   are created once in the UI; Terraform consumes them via `data "databricks_catalog"` and manages
+   all contents (schemas, volume, grants). This is the documented "manual GUI = last resort" escape.
+2. **"Grants to `data_engineers`/`analysts` groups" → not resolvable on Free Edition.** UC grants
+   accept only account-level principals; custom groups need the account console (Premium). Even
+   workspace-local SCIM groups (which *can* be created) are rejected by UC grant resolution.
+   **Fix:** grants map to FE-available principals — engineers = workspace owner (via
+   `data "databricks_current_user"`, so no email in the repo), analysts = built-in `account users` —
+   parameterized (`engineers_principal`/`analysts_principal`) for Premium. The boundary is now
+   **live and verified** (analysts read silver+gold, absent from bronze), not symbolic.
+
+Everything inside the catalogs (7 schemas, the managed `landing` volume, 3 grants) provisioned
+cleanly from Terraform. Managed volumes under Default Storage work fine — only catalog *creation* is
+gated. See `2026-06-26-delta-on-uc-writer-design.md` for the follow-up (pipeline → Delta-on-UC).

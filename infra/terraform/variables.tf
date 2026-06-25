@@ -9,14 +9,20 @@ variable "catalog_prefix" {
   }
 }
 
-variable "data_engineers_group" {
-  description = "Unity Catalog account group with full access to all layers (incl. bronze PHI)."
+# Engineers principal: full access to all layers incl. bronze PHI.
+# Empty (default) = the workspace owner (current user), resolved dynamically so no email/PII is
+# committed to this public repo. On Premium, set to an account group, e.g. "data_engineers".
+variable "engineers_principal" {
+  description = "UC principal with full access to all layers (incl. bronze PHI). Empty = current user."
   type        = string
-  default     = "data_engineers"
+  default     = ""
 }
 
-variable "analysts_group" {
-  description = "Unity Catalog account group with read access to silver + gold only (never bronze)."
+# Analysts principal: read access to silver + gold only, never bronze.
+# Default `account users` is the built-in account group available on Free Edition (every workspace
+# user). On Premium, set to a dedicated account group, e.g. "analysts".
+variable "analysts_principal" {
+  description = "UC principal with read access to silver + gold only (never bronze)."
   type        = string
-  default     = "analysts"
+  default     = "account users"
 }

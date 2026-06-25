@@ -1,6 +1,9 @@
 # Copy to terraform.tfvars (gitignored) and adjust. Values here are NON-SECRET.
 # Auth is NOT set here — export DATABRICKS_HOST and DATABRICKS_TOKEN in your shell instead.
 
-catalog_prefix       = "vitals"
-data_engineers_group = "data_engineers"
-analysts_group       = "analysts"
+catalog_prefix = "vitals"
+
+# Free Edition defaults: engineers = current user (leave empty), analysts = built-in "account users".
+# On a Premium account, point these at real account groups instead:
+# engineers_principal = "data_engineers"
+# analysts_principal  = "analysts"

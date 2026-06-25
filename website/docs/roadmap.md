@@ -5,7 +5,7 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 ## Phase 0 — Repo & tooling ✅
 - [x] Repo, `mise` (databricks CLI / terraform / python) + `uv` venv
 - [x] This documentation site live (auto-deployed via GitHub Actions)
-- [x] Databricks Free Edition workspace; Unity Catalog + Delta schema (deployment target) — Terraform IaC in `infra/terraform/`
+- [x] Databricks Free Edition workspace; Unity Catalog + Delta schema (deployment target) — Terraform IaC in `infra/terraform/`, **applied & verified** on the live workspace (3 catalogs, 7 schemas, `landing` volume, live PHI-gating grants: analysts read silver+gold, never bronze)
 
 ## Phase 1 — MVP vertical slice (FHIR end-to-end) ✅
 - [x] FHIR-shaped NDJSON landed in bronze (seeded synthetic generator)
