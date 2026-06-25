@@ -3,7 +3,7 @@
 python = "3.12"
 uv = "latest"
 terraform = "latest"
-"npm:@databricks/cli" = "latest"
+databricks-cli = "latest"
 
 [env]
 # uv-managed venv lives in .venv
