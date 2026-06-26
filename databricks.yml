@@ -1,0 +1,46 @@
+# Databricks Asset Bundle — the production deploy path for the Vitals medallion (ADR 0005).
+# The interactive databricks-connect run (make *-databricks) is for dev; this bundle ships the
+# pipeline as a scheduled serverless JOB, deployed reproducibly from code:
+#   databricks bundle validate && databricks bundle deploy && databricks bundle run vitals_medallion
+# Auth comes from the environment (source infra/terraform/.env first).
+bundle:
+  name: vitals
+
+targets:
+  dev:
+    mode: development
+    default: true
+
+resources:
+  jobs:
+    vitals_medallion:
+      name: vitals-gold-refresh
+      # Currently ships the GOLD stage as a scheduled serverless job (dbt marts + the 26 dbt tests
+      # as in-job quality gates). Upstream bronze/silver run today via databricks-connect
+      # (make bronze-/silver-databricks); promoting them into this job is a documented follow-up
+      # (a python_wheel_task: ambient serverless Spark + generate to a writable dir + land to volume).
+      # Daily refresh, PAUSED by default — this is a demo workspace; unpause to schedule for real.
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: Europe/Lisbon
+        pause_status: PAUSED
+      # Serverless environment carrying the dbt adapter for the dbt task.
+      environments:
+        - environment_key: dbt_env
+          spec:
+            client: "2"
+            dependencies:
+              - dbt-databricks>=1.8
+      tasks:
+        # Gold: rebuild the dbt marts on Unity Catalog + run the 26 dbt tests as quality gates.
+        - task_key: gold_dbt
+          environment_key: dbt_env
+          dbt_task:
+            project_directory: ./dbt
+            # The managed dbt task auto-generates a profile (target: databricks_cluster) wired to
+            # this warehouse + catalog/schema; our ./dbt/profiles.yml is for local/dev only.
+            catalog: vitals_gold
+            schema: marts
+            commands:
+              - "dbt build --target databricks_cluster"
+            warehouse_id: e2d0993979faf3d2

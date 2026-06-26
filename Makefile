@@ -1,4 +1,4 @@
-.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks
+.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks bundle-deploy bundle-run
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -46,6 +46,13 @@ gold-baseline:  ## refresh local gold + write the parity baseline (main venv, ha
 gold-databricks:  ## build gold on UC via dbt-databricks + verify parity (run `source infra/terraform/.env` first)
 	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt build --target databricks
 	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta gold
+
+bundle-deploy:  ## deploy the Asset Bundle job to Databricks (run `source infra/terraform/.env` first)
+	databricks bundle validate
+	databricks bundle deploy
+
+bundle-run:     ## trigger the deployed gold-refresh job and wait (run `source infra/terraform/.env` first)
+	databricks bundle run vitals_medallion
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

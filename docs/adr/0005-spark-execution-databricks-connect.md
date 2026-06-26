@@ -1,6 +1,6 @@
 # ADR 0005 — databricks-connect for the Delta-on-UC writer, job-submit as the production path
 
-**Status:** accepted · 2026-06-26
+**Status:** accepted · 2026-06-26 · _both paths now implemented (see Update)_
 
 ## Context
 The pipeline's local layers run on DuckDB (ADR 0001). Wiring them to write **Delta into Unity
@@ -46,3 +46,17 @@ Rationale:
 - **A non-serverless cluster:** not available on Free Edition; moot.
 - **Skip Spark, write Delta from local Python (e.g. delta-rs):** sidesteps Databricks compute
   entirely and wouldn't demonstrate the Spark-on-UC competency the role targets.
+
+## Update (2026-06-26) — both paths implemented
+
+- **Dev (databricks-connect):** bronze + silver build Delta on UC interactively
+  (`make bronze-/silver-databricks`), each gated by row-count + DQ parity vs local DuckDB.
+- **Production (job-submit):** a Databricks Asset Bundle (`databricks.yml`) ships the gold stage as a
+  scheduled **serverless job** (`make bundle-deploy` / `bundle-run`) — verified `TERMINATED SUCCESS`.
+  Free-Edition specifics learned: bundle/`databricks api` need `DATABRICKS_AUTH_TYPE=pat` (the
+  `.databrickscfg` DEFAULT profile is OAuth and otherwise breaks token refresh); the managed dbt task
+  **auto-generates** its profile (target `databricks_cluster`, catalog/schema from the task fields),
+  so the project's `--target databricks` is not used in-job.
+- **Open follow-up:** promote bronze/silver into the job as a `python_wheel_task` (needs ambient
+  serverless Spark via `DatabricksSession.builder.getOrCreate()`, a writable generate dir, and
+  volume upload from the job) for a single full-medallion scheduled run.

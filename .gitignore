@@ -34,6 +34,9 @@ mlflow.db
 mlruns/
 dbt/.user.yml
 
+# Databricks Asset Bundles (local deploy state)
+.databricks/
+
 # Terraform
 infra/terraform/.terraform/
 *.tfstate
