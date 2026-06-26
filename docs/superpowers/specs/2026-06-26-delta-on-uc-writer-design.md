@@ -1,11 +1,17 @@
 # Design — Wire the pipeline to Delta-on-UC (writer abstraction)
 
-_Date: 2026-06-26 · Status: in progress (bronze slice DONE & verified) · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
+_Date: 2026-06-26 · Status: in progress (bronze + silver slices DONE & verified) · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
 
-> **Progress:** Bronze slice shipped — `src/vitals/backends/databricks_delta.py` lands the 8 raw
-> NDJSON sources into the `vitals_bronze.raw.landing` volume and writes Delta to `vitals_bronze.raw.*`
-> via databricks-connect (ADR 0005). Row-count parity vs local DuckDB bronze verified for all 8
-> sources; unit tests for the parity logic in `tests/test_backends_parity.py`. Next: silver slice.
+> **Progress:** Bronze + silver slices shipped in `src/vitals/backends/databricks_delta.py`.
+> - **Bronze:** 8 raw NDJSON sources → `vitals_bronze.raw.landing` volume → Delta `vitals_bronze.raw.*`.
+> - **Silver:** the DuckDB de-id/conform logic ported to Spark → Delta `vitals_silver.clinical.*`
+>   (8 tables). PHI boundary asserted (no identifiers in `silver.patient`); full DQ parity vs local
+>   DuckDB verified (row counts + coding %, unit standardization, text-recovery counts). Shared
+>   vocabulary maps extracted to `src/vitals/vocab.py` (used by both backends).
+> - **Bug found by cross-engine verification:** DuckDB inferred claims `total.value` as JSON, so the
+>   ~4% of billed amounts encoded as JSON strings were silently NULLed (quotes survived the VARCHAR
+>   cast). Fixed in `lakehouse.py` (`->>'$'` scalar extract); both backends now agree at 100% numeric.
+> Run via databricks-connect (ADR 0005). Tests in `tests/test_backends_parity.py`. Next: gold (dbt-databricks).
 
 ## Goal
 

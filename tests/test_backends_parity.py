@@ -37,3 +37,36 @@ def test_sources_cover_the_eight_bronze_entities():
         "patients", "encounters", "conditions", "observations",
         "notes", "claims", "pro_surveys", "wearables",
     }
+
+
+# ---- silver: PHI boundary + transform contract ------------------------------------------------
+
+def test_assert_no_phi_passes_for_deidentified_columns():
+    dd.assert_no_phi(["patient_key", "gender", "age", "_date_shift_days"])  # must not raise
+
+
+def test_assert_no_phi_raises_when_identifier_leaks():
+    import pytest
+    for leak in ("name", "identifier", "address", "birthDate", "ssn"):
+        with pytest.raises(AssertionError):
+            dd.assert_no_phi(["patient_key", leak])
+
+
+def test_silver_statements_build_all_tables_patient_first():
+    stmts = dd._silver_statements()
+    names = [name for name, _ in stmts]
+    assert names[0] == "patient", "patient must build first — other tables join to it"
+    assert set(names) == set(dd.SILVER_TABLES)
+
+
+def test_silver_patient_drops_phi_and_keeps_surrogate_key():
+    sql = dict(dd._silver_statements())["patient"]
+    assert "md5(id) AS patient_key" in sql            # hashed surrogate key
+    assert "_date_shift_days" in sql                  # interval-preserving date shift
+    for phi in ("name", "address", "identifier", "birthDate"):
+        assert f" {phi}" not in sql.replace("birthDate IS NULL", "")  # not selected (birthDate only in age calc)
+
+
+def test_silver_condition_embeds_vocab_recovery():
+    sql = dict(dd._silver_statements())["condition"]
+    assert "low back pain" in sql and "M54.5" in sql  # free-text -> ICD-10 recovery is wired

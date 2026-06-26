@@ -13,29 +13,13 @@ from pathlib import Path
 
 import duckdb
 
+from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
+
 ROOT = Path(__file__).resolve().parents[2]
 BRONZE = ROOT / "data" / "bronze"
 DB = ROOT / "data" / "vitals.duckdb"
 DQ_OUT = ROOT / "data" / "dq_report.json"
-
-MMOL_TO_MGDL = 18.0182  # glucose conversion factor
-
-# Free-text condition -> ICD-10 (the silver layer recovers validity the bronze data lost).
-TEXT_TO_ICD = {
-    "low back pain": "M54.5",
-    "knee osteoarthritis": "M17.0",
-    "rotator cuff tear": "M75.100",
-    "herniated disc": "M51.26",
-    "right knee pain": "M25.561",
-}
-# Canonical display per ICD-10 code (conforms both coded and text-recovered conditions).
-ICD_DISPLAY = {
-    "M54.5": "Low back pain",
-    "M17.0": "Bilateral primary osteoarthritis of knee",
-    "M75.100": "Rotator cuff tear",
-    "M51.26": "Lumbar disc displacement",
-    "M25.561": "Pain in right knee",
-}
+SILVER_BASELINE = ROOT / "data" / "silver_baseline.json"  # per-table counts, for cross-backend parity
 
 
 def build() -> dict:
@@ -138,7 +122,10 @@ def build() -> dict:
                   c.procedure[1].code    AS procedure_code,
                   c.procedure[1].display AS procedure_display,
                   c.diagnosis[1].code    AS dx_code,
-                  TRY_CAST(CAST(c.total.value AS VARCHAR) AS DOUBLE) AS billed,
+                  -- total.value is JSON (mess-injector encodes ~4% of amounts as JSON *strings*);
+                  -- ->>'$' extracts the scalar text (unquoted) so quoted amounts parse too. Casting
+                  -- to VARCHAR instead would keep the JSON quotes and silently NULL those valid rows.
+                  TRY_CAST(c.total.value->>'$' AS DOUBLE) AS billed,
                   c.paid                 AS paid,
                   c.status               AS status,
                   (c.status = 'denied')  AS denied
@@ -175,6 +162,14 @@ def build() -> dict:
     # de-id assertion: silver.patient must carry no PHI columns
     cols = {c[0] for c in con.execute("DESCRIBE silver.patient").fetchall()}
     assert not (cols & {"name", "identifier", "address", "birthDate"}), f"PHI leaked into silver: {cols}"
+
+    # Per-table silver row counts -> baseline file, so other backends (Delta-on-UC) can verify
+    # row-count parity without needing DuckDB. Regenerated every build, so it tracks the data.
+    tables = [r[0] for r in con.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='silver' ORDER BY 1"
+    ).fetchall()]
+    baseline = {t: _scalar(con, f"SELECT count(*) FROM silver.{t}") for t in tables}
+    SILVER_BASELINE.write_text(json.dumps(baseline, indent=2))
 
     print("silver built. DQ report:", json.dumps(report, indent=2))
     con.close()

@@ -1,4 +1,4 @@
-.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks
+.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -34,7 +34,10 @@ dbcxn-setup:    ## create the databricks-connect venv (separate — conflicts wi
 	uv pip install --python .venv-dbcxn/bin/python "databricks-connect==17.3.*"
 
 bronze-databricks:  ## land bronze -> Delta on Unity Catalog (run `source infra/terraform/.env` first)
-	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta
+	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta bronze
+
+silver-databricks:  ## bronze Delta -> de-identified silver Delta on UC (run `source infra/terraform/.env` first)
+	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta silver
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns
