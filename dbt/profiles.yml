@@ -6,3 +6,13 @@ vitals:
       path: ../data/vitals.duckdb
       schema: gold
       threads: 4
+    # Deployment target: gold on Databricks Unity Catalog via the serverless SQL warehouse.
+    # Auth from env (source infra/terraform/.env first); host needs the bare hostname.
+    databricks:
+      type: databricks
+      host: "{{ env_var('DATABRICKS_HOST') | replace('https://', '') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH', '/sql/1.0/warehouses/e2d0993979faf3d2') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      catalog: vitals_gold
+      schema: marts
+      threads: 4

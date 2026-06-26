@@ -1,6 +1,14 @@
 # Design — Wire the pipeline to Delta-on-UC (writer abstraction)
 
-_Date: 2026-06-26 · Status: in progress (bronze + silver slices DONE & verified) · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
+_Date: 2026-06-26 · Status: DONE — bronze + silver + gold all on UC with end-to-end parity · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
+
+> **Gold slice (final):** the existing dbt models build into `vitals_gold.marts` via `dbt-databricks`
+> against the serverless SQL warehouse (`dbt build --target databricks`). The `silver` source is
+> target-aware (`vitals_silver.clinical` on Databricks, `silver` on DuckDB); gold output catalog/schema
+> come from the `databricks` profile. All 10 models + 26 dbt tests pass on Databricks; all 11 gold
+> tables match local DuckDB row counts. Verified reproducibly via `make gold-baseline` + `make
+> gold-databricks`. Remaining (separate unit): the production Asset-Bundle/job deploy path (ADR 0005).
+
 
 > **Progress:** Bronze + silver slices shipped in `src/vitals/backends/databricks_delta.py`.
 > - **Bronze:** 8 raw NDJSON sources → `vitals_bronze.raw.landing` volume → Delta `vitals_bronze.raw.*`.

@@ -37,10 +37,13 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 ### Original Phase 4 checklist
 - [ ] Lineage + data dictionary + Unity Catalog governance; drift monitoring; decision write-ups
 
-## Phase 5 — Deploy to Databricks (Delta-on-UC) 🔄
+## Phase 5 — Deploy to Databricks (Delta-on-UC) ✅
 Wire the local pipeline to write **Delta into Unity Catalog** on the live Free Edition workspace.
+The full medallion (bronze → silver → gold) runs on Databricks with **end-to-end row-count + DQ
+parity** verified against the local DuckDB pipeline.
 - [x] **UC object graph applied & verified** via Terraform (`infra/terraform/`): 3 catalogs, 7 schemas, `landing` volume, live PHI-gating grants (analysts read silver+gold, never bronze). See ADR notes + the [Governance](governance.md) page.
 - [x] **Bronze → Delta**: backend abstraction (`VITALS_TARGET=local|databricks`); raw NDJSON landed into the `vitals_bronze.raw.landing` UC volume and written as 8 Delta tables in `vitals_bronze.raw.*` via databricks-connect on serverless ([ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md)). Row-count parity vs the local DuckDB bronze verified for all 8 sources.
 - [x] **Silver → Delta** (the PHI boundary on UC): de-id + conform ported to Spark, written as 8 Delta tables in `vitals_silver.clinical.*`. De-id assertion (no identifiers in `silver.patient`) + full DQ parity vs local DuckDB verified (row counts, coding %, unit standardization, text-recovery). Cross-engine verification also surfaced & fixed a latent DuckDB bug (quoted-JSON billed amounts silently dropped).
-- [ ] Gold via `dbt-databricks` profile (marts/features/vectors/monitoring).
+- [x] **Gold via dbt-databricks**: the existing dbt models build into `vitals_gold.marts` on the serverless SQL warehouse (target-aware `silver` source resolves to `vitals_silver.clinical`). All 10 models + 26 dbt tests pass on Databricks; all 11 gold tables match local DuckDB row counts.
+- [ ] Production deploy path: Databricks Asset Bundle + scheduled job (the deployment half of ADR 0005).
 - [ ] Production deploy path: Databricks Asset Bundle + scheduled job (the deployment half of ADR 0005).

@@ -1,4 +1,4 @@
-.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks
+.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -38,6 +38,14 @@ bronze-databricks:  ## land bronze -> Delta on Unity Catalog (run `source infra/
 
 silver-databricks:  ## bronze Delta -> de-identified silver Delta on UC (run `source infra/terraform/.env` first)
 	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta silver
+
+gold-baseline:  ## refresh local gold + write the parity baseline (main venv, has duckdb)
+	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt build --target dev
+	PYTHONPATH=src ./.venv/bin/python -m vitals.backends.databricks_delta gold-baseline
+
+gold-databricks:  ## build gold on UC via dbt-databricks + verify parity (run `source infra/terraform/.env` first)
+	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt build --target databricks
+	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta gold
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

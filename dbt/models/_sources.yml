@@ -3,7 +3,9 @@ version: 2
 sources:
   - name: silver
     description: De-identified, conformed clean layer built by the bronze→silver pipeline.
-    schema: silver
+    # On DuckDB silver lives in schema `silver`; on Databricks it's vitals_silver.clinical.
+    database: "{{ 'vitals_silver' if target.type == 'databricks' else none }}"
+    schema: "{{ 'clinical' if target.type == 'databricks' else 'silver' }}"
     tables:
       - name: patient
       - name: observation

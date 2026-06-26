@@ -44,6 +44,13 @@ SILVER_TABLES = [
 # Columns that must NEVER appear in silver.patient (HIPAA Safe Harbor identifiers).
 PHI_COLUMNS = {"name", "identifier", "address", "birthDate", "ssn"}
 
+# Gold: built by dbt (`dbt build --target databricks`) into vitals_gold.marts. Parity is checked
+# against a baseline of the local DuckDB gold (written by `gold-baseline`).
+GOLD_CATALOG = "vitals_gold"
+GOLD_SCHEMA = "marts"
+GOLD_BASELINE = ROOT / "data" / "gold_baseline.json"
+LOCAL_DB = ROOT / "data" / "vitals.duckdb"
+
 
 # ---- pure logic (unit-testable, no I/O) -------------------------------------------------------
 
@@ -238,6 +245,43 @@ def _print_parity(title: str, report: dict[str, dict]) -> bool:
     return all_match(report)
 
 
+# ---- gold: parity of the dbt-built gold (vitals_gold.marts) vs local DuckDB gold ---------------
+
+def write_local_gold_baseline() -> dict[str, int]:
+    """Dump local DuckDB `gold.*` row counts to GOLD_BASELINE (run in the main venv, has duckdb).
+    Introspects the schema so new models are picked up automatically."""
+    import duckdb  # lazy: only the local venv has duckdb (the connect venv does not)
+
+    con = duckdb.connect(str(LOCAL_DB))
+    tbls = [r[0] for r in con.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='gold' ORDER BY 1"
+    ).fetchall()]
+    counts = {t: con.execute(f"SELECT count(*) FROM gold.{t}").fetchone()[0] for t in tbls}
+    con.close()
+    GOLD_BASELINE.write_text(json.dumps(counts, indent=2))
+    print(f"wrote {GOLD_BASELINE.name}: {len(counts)} gold tables")
+    return counts
+
+
+def gold_baseline() -> dict[str, int]:
+    return json.loads(GOLD_BASELINE.read_text())
+
+
+def verify_gold() -> dict[str, int]:
+    """Remote row counts for the dbt-built gold tables in vitals_gold.marts."""
+    spark = _spark()
+    return {t: spark.table(f"{GOLD_CATALOG}.{GOLD_SCHEMA}.{t}").count() for t in gold_baseline()}
+
+
+def main_gold() -> None:
+    print(f"[gold parity] {GOLD_CATALOG}.{GOLD_SCHEMA} vs local DuckDB gold "
+          "(build first: dbt build --target databricks) ...")
+    ok = _print_parity("table", parity_report(gold_baseline(), verify_gold()))
+    print(f"\n{'✅ gold parity: all tables match local DuckDB' if ok else '❌ gold parity FAILED'}")
+    if not ok:
+        raise SystemExit(1)
+
+
 def main_bronze() -> None:
     print(f"[bronze->delta] landing {len(SOURCES)} sources into {CATALOG}.{SCHEMA} ...")
     ok = _print_parity("source", parity_report(local_counts(), land_bronze()))
@@ -264,11 +308,15 @@ def main() -> None:
         main_bronze()
     elif stage == "silver":
         main_silver()
+    elif stage == "gold":
+        main_gold()
+    elif stage == "gold-baseline":
+        write_local_gold_baseline()
     elif stage == "all":
         main_bronze()
         main_silver()
     else:
-        raise SystemExit(f"unknown stage {stage!r} (use: bronze | silver | all)")
+        raise SystemExit(f"unknown stage {stage!r} (use: bronze | silver | gold | gold-baseline | all)")
 
 
 if __name__ == "__main__":
