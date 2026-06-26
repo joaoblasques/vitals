@@ -1,4 +1,4 @@
-.PHONY: setup run dbt clean
+.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -25,6 +25,16 @@ monitor:        ## Phase 4: feature-drift monitoring (PSI)
 catalog:        ## Phase 4: regenerate the data dictionary + lineage from dbt
 	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt docs generate
 	PYTHONPATH=src ./.venv/bin/python -m vitals.catalog
+
+test:           ## run the Python unit test suite
+	uv run --extra dev pytest tests/ -q
+
+dbcxn-setup:    ## create the databricks-connect venv (separate — conflicts with pyspark)
+	uv venv --python 3.12 .venv-dbcxn
+	uv pip install --python .venv-dbcxn/bin/python "databricks-connect==17.3.*"
+
+bronze-databricks:  ## land bronze -> Delta on Unity Catalog (run `source infra/terraform/.env` first)
+	PYTHONPATH=src ./.venv-dbcxn/bin/python -m vitals.backends.databricks_delta
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

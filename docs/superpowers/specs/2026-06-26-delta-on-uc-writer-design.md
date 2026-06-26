@@ -1,6 +1,11 @@
 # Design — Wire the pipeline to Delta-on-UC (writer abstraction)
 
-_Date: 2026-06-26 · Status: draft (for review) · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
+_Date: 2026-06-26 · Status: in progress (bronze slice DONE & verified) · Phase: Phase 5 — the deployment follow-up to Phase 0 UC IaC_
+
+> **Progress:** Bronze slice shipped — `src/vitals/backends/databricks_delta.py` lands the 8 raw
+> NDJSON sources into the `vitals_bronze.raw.landing` volume and writes Delta to `vitals_bronze.raw.*`
+> via databricks-connect (ADR 0005). Row-count parity vs local DuckDB bronze verified for all 8
+> sources; unit tests for the parity logic in `tests/test_backends_parity.py`. Next: silver slice.
 
 ## Goal
 

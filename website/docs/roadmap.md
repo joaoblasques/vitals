@@ -36,3 +36,10 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 
 ### Original Phase 4 checklist
 - [ ] Lineage + data dictionary + Unity Catalog governance; drift monitoring; decision write-ups
+
+## Phase 5 — Deploy to Databricks (Delta-on-UC) 🔄
+Wire the local pipeline to write **Delta into Unity Catalog** on the live Free Edition workspace.
+- [x] **UC object graph applied & verified** via Terraform (`infra/terraform/`): 3 catalogs, 7 schemas, `landing` volume, live PHI-gating grants (analysts read silver+gold, never bronze). See ADR notes + the [Governance](governance.md) page.
+- [x] **Bronze → Delta**: backend abstraction (`VITALS_TARGET=local|databricks`); raw NDJSON landed into the `vitals_bronze.raw.landing` UC volume and written as 8 Delta tables in `vitals_bronze.raw.*` via databricks-connect on serverless ([ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md)). Row-count parity vs the local DuckDB bronze verified for all 8 sources.
+- [ ] Silver → Delta (de-id boundary on UC) + gold via `dbt-databricks` profile.
+- [ ] Production deploy path: Databricks Asset Bundle + scheduled job (the deployment half of ADR 0005).

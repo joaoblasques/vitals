@@ -18,11 +18,19 @@ dependencies = [
 [project.optional-dependencies]
 # Deployment target (Databricks) + scale path (PySpark) — not needed to run the MVP.
 databricks = ["pyspark>=3.5", "dbt-databricks>=1.8"]
+# Delta-on-UC writer: runs Spark on Databricks serverless via Spark Connect (ADR 0005).
+# NOTE: mutually exclusive with the `databricks` extra above — databricks-connect bundles its own
+# pyspark, so install one OR the other in a given environment, never both.
+databricks-connect = ["databricks-connect==17.3.*"]
 feast = ["feast>=0.40"]
 dev = ["ruff", "pytest"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
 
 [tool.ruff]
 target-version = "py312"
