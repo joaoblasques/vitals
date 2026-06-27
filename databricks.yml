@@ -1,8 +1,13 @@
 # Databricks Asset Bundle — the production deploy path for the Vitals medallion (ADR 0005).
-# The interactive databricks-connect run (make *-databricks) is for dev; this bundle ships the
-# pipeline as a scheduled serverless JOB, deployed reproducibly from code:
+#
+# Build with connect, ship with the bundle:
+#   DEV  = databricks-connect (make bronze-/silver-databricks) — laptop drives, Databricks computes;
+#          fast feedback for building + parity-checking.
+#   PROD = this bundle — Databricks owns it: a scheduled serverless JOB, deployed from code, with the
+#          dbt tests as in-job quality gates. No laptop, no human.
+#
+# Deploy + run (auth from the environment — source infra/terraform/.env first):
 #   databricks bundle validate && databricks bundle deploy && databricks bundle run vitals_medallion
-# Auth comes from the environment (source infra/terraform/.env first).
 bundle:
   name: vitals
 

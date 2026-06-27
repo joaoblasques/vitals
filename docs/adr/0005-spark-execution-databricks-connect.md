@@ -49,6 +49,12 @@ Rationale:
 
 ## Update (2026-06-26) — both paths implemented
 
+**The frame: build with connect, ship with the bundle.** DEV = databricks-connect (laptop drives,
+Databricks computes) for fast build-and-verify; PROD = an Asset Bundle serverless job (Databricks
+owns it, scheduled, tests-as-gates, unattended). One shared codebase behind a target switch, so the
+two paths can't drift — the cost is maintaining two entry points, justified because each optimizes a
+different phase.
+
 - **Dev (databricks-connect):** bronze + silver build Delta on UC interactively
   (`make bronze-/silver-databricks`), each gated by row-count + DQ parity vs local DuckDB.
 - **Production (job-submit):** a Databricks Asset Bundle (`databricks.yml`) ships the gold stage as a
