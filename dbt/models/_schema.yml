@@ -34,3 +34,11 @@ models:
       - name: surgery_90d
         tests:
           - accepted_values: {values: [0, 1]}
+  - name: metricflow_time_spine
+    description: Calendar-day spine required by the dbt Semantic Layer (MetricFlow).
+    time_spine:
+      standard_granularity_column: date_day
+    columns:
+      - name: date_day
+        data_type: date
+        granularity: day

@@ -1,0 +1,34 @@
+semantic_models:
+  - name: patient_metrics
+    description: Per-patient analytics base — the grain is one row per de-identified patient.
+    model: ref('fct_patient_metrics')
+    entities:
+      - name: patient
+        type: primary
+        expr: patient_key
+    dimensions:
+      - name: metric_date
+        type: time
+        type_params:
+          time_granularity: day
+      - name: primary_condition
+        type: categorical
+      - name: primary_condition_code
+        type: categorical
+    measures:
+      - {name: patients,               agg: count,   expr: patient_key,   agg_time_dimension: metric_date}
+      - {name: surgery_rate_measure,   agg: average, expr: surgery_90d,   agg_time_dimension: metric_date}
+      - {name: pain,                   agg: average, expr: mean_pain,     agg_time_dimension: metric_date}
+      - {name: adherence,              agg: average, expr: mean_adherence, agg_time_dimension: metric_date}
+      - {name: conservative_spend,     agg: average, expr: total_paid,    agg_time_dimension: metric_date}
+      - {name: imaging,                agg: average, expr: had_imaging,   agg_time_dimension: metric_date}
+      - {name: denials,                agg: average, expr: denial_rate,   agg_time_dimension: metric_date}
+
+metrics:
+  - {name: patient_count,          type: simple, label: "Patients",               type_params: {measure: patients}}
+  - {name: surgery_rate,           type: simple, label: "Surgery rate (90d)",      type_params: {measure: surgery_rate_measure}}
+  - {name: avg_pain,               type: simple, label: "Avg pain",                type_params: {measure: pain}}
+  - {name: avg_adherence,          type: simple, label: "Avg adherence %",         type_params: {measure: adherence}}
+  - {name: avg_conservative_spend, type: simple, label: "Avg conservative spend",  type_params: {measure: conservative_spend}}
+  - {name: imaging_rate,           type: simple, label: "Imaging rate",            type_params: {measure: imaging}}
+  - {name: claim_denial_rate,      type: simple, label: "Claim denial rate",       type_params: {measure: denials}}

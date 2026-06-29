@@ -25,6 +25,8 @@ databricks-connect = ["databricks-connect==17.3.*"]
 feast = ["feast>=0.40"]
 # Vector index serving store — local pgvector (Docker) + fastembed embeddings (ADR 0006).
 vector = ["fastembed>=0.3", "psycopg[binary]>=3.1", "pgvector>=0.3"]
+# Semantic layer — MetricFlow over the marts' star (ADR 0007); optional, not needed for the MVP.
+metrics = ["dbt-metricflow[duckdb]"]
 dev = ["ruff", "pytest"]
 
 [tool.setuptools.packages.find]
