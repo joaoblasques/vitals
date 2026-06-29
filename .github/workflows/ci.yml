@@ -1,0 +1,51 @@
+name: CI
+
+# Hermetic quality gate — runs on every push/PR with NO credentials (DuckDB only). The credentialed
+# Databricks parity stays a manual step (make bronze-/silver-/gold-/drift-databricks).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "dbt/**"
+      - "tests/**"
+      - "pipelines/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - "mise.toml"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "dbt/**"
+      - "tests/**"
+      - "pipelines/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "Makefile"
+      - "mise.toml"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv (with lockfile cache)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Install deps (from lock)
+        run: uv sync --extra dev
+      - name: Lint (ruff)
+        run: uv run ruff check .
+      - name: Unit tests (pytest)
+        run: uv run pytest -q
+      - name: DQ gate — local pipeline (PHI boundary + 26 dbt tests)
+        run: make build

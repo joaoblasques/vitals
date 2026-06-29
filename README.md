@@ -2,6 +2,8 @@
 
 **From raw clinical signals to trusted, AI-ready data.**
 
+[![CI](https://github.com/joaoblasques/vitals/actions/workflows/ci.yml/badge.svg)](https://github.com/joaoblasques/vitals/actions/workflows/ci.yml)
+
 A governed **medallion lakehouse** that ingests messy, multi-source health data and turns it into
 three trusted outputs: **analytics marts**, an **ML feature store**, and a **vector index** for
 retrieval — built on Databricks/Delta with dbt, Airflow, and PySpark.
