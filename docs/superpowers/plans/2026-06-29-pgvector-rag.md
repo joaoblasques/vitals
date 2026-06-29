@@ -96,8 +96,6 @@ Run: `make rag-up`, then `python -m vitals.vector_index load` / `... query "low 
 from __future__ import annotations
 
 import hashlib
-import os
-import sys
 
 MODEL = "BAAI/bge-small-en-v1.5"
 DIM = 384
@@ -154,7 +152,7 @@ Expected: PASS (5 passed).
 - [ ] **Step 5: Lint**
 
 Run: `uv run ruff check src/vitals/vector_index.py tests/test_vector_index.py`
-Expected: `All checks passed!` (`sys`/`os` are used by the I/O layer added in Task 2; if ruff flags them as unused now, proceed — Task 2 adds their uses in the same file before any commit gate. If you prefer a clean intermediate lint, add the I/O layer (Task 2 Step 3) before committing.)
+Expected: `All checks passed!` (the module imports only `hashlib` here; `os`/`sys` are added with their uses in Task 2.)
 
 - [ ] **Step 6: Commit**
 
@@ -215,7 +213,7 @@ services:
 
 - [ ] **Step 3: Append the I/O layer + `main()` to `src/vitals/vector_index.py`**
 
-Append after the pure functions:
+First add `import os` and `import sys` to the top-of-file import block (alphabetical, alongside `import hashlib`). Then append after the pure functions:
 
 ```python
 # ---- I/O (lazy imports: fastembed / psycopg / pgvector) ---------------------------------------
