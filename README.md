@@ -32,7 +32,7 @@ different things:
 |---|---|---|
 | **Analytics marts** | dbt (Kimball star) + semantic layer | BI, cohorts, clinical/commercial reporting |
 | **Feature store** | Feast (offline + online) | surgery-risk / adherence ML models |
-| **Vector index** | pgvector | RAG / semantic search over clinical notes |
+| **Vector index** | pgvector | RAG / semantic search over clinical notes (`make rag-up` for the real store; TF-IDF fallback otherwise) |
 
 ## Architecture (medallion + a healthcare layer)
 

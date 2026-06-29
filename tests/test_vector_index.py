@@ -30,3 +30,28 @@ def test_shape_matches_rounds_score_and_truncates_note():
     long = "x" * 200
     out = vx.shape_matches([("p1", long, 0.912345)])
     assert out == [{"patient_key": "p1", "score": 0.912, "note": "x" * 160}]
+
+
+def test_serve_rag_routes_to_pgvector_when_available(monkeypatch):
+    """When pgvector is reachable, serve._rag_demo delegates to vector_index.rag_demo."""
+    import pandas as pd
+    from vitals import serve, vector_index
+    monkeypatch.setattr(vector_index, "is_available", lambda: True)
+    monkeypatch.setattr(vector_index, "rag_demo", lambda notes, queries: {"routed": "pgvector"})
+    notes = pd.DataFrame({"patient_key": ["a"], "text": ["low back pain"]})
+    assert serve._rag_demo(notes, ["q"]) == {"routed": "pgvector"}
+
+
+def test_serve_rag_falls_back_to_tfidf_when_unavailable(monkeypatch):
+    """When pgvector is down, serve._rag_demo uses TF-IDF (and does not touch psycopg/fastembed)."""
+    import pandas as pd
+    from vitals import serve, vector_index
+    monkeypatch.setattr(vector_index, "is_available", lambda: False)
+    notes = pd.DataFrame({
+        "patient_key": ["a", "b", "c", "d"],
+        "text": ["low back pain worse sitting", "low back pain improving",
+                 "shoulder pain overhead", "shoulder pain reaching"],
+    })
+    res = serve._rag_demo(notes, ["low back pain"])
+    assert res["embedding"].startswith("TF-IDF")
+    assert res["n_notes_indexed"] == 4

@@ -1,7 +1,8 @@
 """AI-ready serving layer — the three things a health-tech team does with clean data.
 
 1. Feature store  : per-patient, time-aware features (offline table + parquet; Feast repo in ml/).
-2. Vector index   : TF-IDF embeddings of clinical notes + a cosine RAG query (pgvector in prod).
+2. Vector index   : clinical-note embeddings + cosine RAG — real pgvector when up (vitals.vector_index),
+                    in-memory TF-IDF fallback otherwise.
 3. Demo model     : surgery-risk classifier consuming the features, tracked in MLflow.
 """
 from __future__ import annotations
@@ -106,6 +107,15 @@ def run() -> dict:
 
 
 def _rag_demo(notes: pd.DataFrame, queries: list[str]) -> dict:
+    # Prefer the real pgvector store; fall back to in-memory TF-IDF when it (or the `vector` extra)
+    # is unavailable, so clone-and-run / hermetic CI never depend on Docker.
+    try:
+        from vitals import vector_index as vx
+        if vx.is_available():
+            return vx.rag_demo(notes, queries)
+    except Exception:
+        pass
+
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
 
@@ -122,7 +132,7 @@ def _rag_demo(notes: pd.DataFrame, queries: list[str]) -> dict:
         })
     return {
         "n_notes_indexed": int(len(notes)),
-        "embedding": "TF-IDF (prod target: pgvector + clinical embeddings)",
+        "embedding": "TF-IDF (fallback; prod target: pgvector + clinical embeddings)",
         "vocab_size": int(len(vec.vocabulary_)),
         "demo_queries": out,
     }
