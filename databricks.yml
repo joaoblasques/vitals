@@ -11,6 +11,16 @@
 bundle:
   name: vitals
 
+variables:
+  alert_email:
+    description: |
+      Recipient paged when an unattended run fails. Defaults to the deploying user (the workspace
+      owner), resolved dynamically — no address is committed to this PUBLIC repo (same no-PII
+      pattern as the Terraform UC grants). Override for a shared on-call list at deploy time:
+      `export BUNDLE_VAR_alert_email=oncall@example.com` (the infra/terraform/.env we already
+      source) or `databricks bundle deploy --var alert_email=...`.
+    default: ${workspace.current_user.userName}
+
 targets:
   dev:
     mode: development
@@ -29,6 +39,14 @@ resources:
         quartz_cron_expression: "0 0 6 * * ?"
         timezone_id: Europe/Lisbon
         pause_status: PAUSED
+      # Page someone when an unattended run FAILS — a deployed job that fails silently isn't
+      # operated, it's just shipped. on_failure only (success is the boring default); a paused
+      # demo shouldn't spam, so suppress alerts for skipped runs.
+      email_notifications:
+        on_failure:
+          - ${var.alert_email}
+      notification_settings:
+        no_alert_for_skipped_runs: true
       # Serverless environment carrying the dbt adapter for the dbt task.
       environments:
         - environment_key: dbt_env
