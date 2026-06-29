@@ -1,4 +1,4 @@
-.PHONY: setup run dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run
+.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -6,6 +6,9 @@ setup:          ## create venv + install the runnable MVP stack
 
 run:            ## run the full MVP slice end-to-end
 	PYTHONPATH=src ./.venv/bin/python -m vitals.run
+
+build:          ## hermetic data gate: generate -> silver (PHI boundary) -> dbt gold + 26 DQ tests; no ML serve
+	PYTHONPATH=src ./.venv/bin/python -m vitals.run --no-serve
 
 dbt:            ## run just the gold transformations + tests
 	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/dbt build
