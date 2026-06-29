@@ -26,7 +26,7 @@ TOPK = 3
 
 def note_id(patient_key: str, text: str) -> str:
     """Deterministic upsert key for a note — stable across reloads (idempotency)."""
-    return hashlib.md5(f"{patient_key}\n{text}".encode()).hexdigest()
+    return hashlib.md5(f"{patient_key}\n{text}".encode(), usedforsecurity=False).hexdigest()
 
 
 def ddl() -> list[str]:

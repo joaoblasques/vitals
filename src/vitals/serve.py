@@ -128,7 +128,7 @@ def _rag_demo(notes: pd.DataFrame, queries: list[str]) -> dict:
         top = sims.argsort()[::-1][:3]
         out.append({
             "query": q,
-            "matches": [{"score": round(float(sims[i]), 3), "note": notes.iloc[i]["text"][:160]} for i in top],
+            "matches": [{"patient_key": notes.iloc[i]["patient_key"], "score": round(float(sims[i]), 3), "note": notes.iloc[i]["text"][:160]} for i in top],
         })
     return {
         "n_notes_indexed": int(len(notes)),

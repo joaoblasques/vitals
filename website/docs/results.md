@@ -47,7 +47,7 @@ The store holds all 20; the demo model below uses a curated, clinically-relevant
 
 ## 4. Vector index + RAG
 
-399 clinical notes embedded (TF-IDF in the MVP; **pgvector + clinical embeddings** in production).
+399 clinical notes embedded via **fastembed bge-small-en-v1.5** (384-d) in a local **pgvector** store (HNSW cosine index); TF-IDF is the clone-and-run fallback when Docker is down.
 
 > **Query:** *"severe lower back pain worse with sitting, poor adherence"*
 > **Top match (0.69):** *"Patient reports severe lower back pain, worse with prolonged sitting.

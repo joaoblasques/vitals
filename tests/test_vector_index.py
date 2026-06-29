@@ -53,5 +53,5 @@ def test_serve_rag_falls_back_to_tfidf_when_unavailable(monkeypatch):
                  "shoulder pain overhead", "shoulder pain reaching"],
     })
     res = serve._rag_demo(notes, ["low back pain"])
-    assert res["embedding"].startswith("TF-IDF")
+    assert res["embedding"].startswith("TF-IDF (fallback;")
     assert res["n_notes_indexed"] == 4
