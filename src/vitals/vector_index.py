@@ -173,7 +173,8 @@ def main(argv: list[str] | None = None) -> None:
         import duckdb
         from pathlib import Path
         db = Path(__file__).resolve().parents[2] / "data" / "vitals.duckdb"
-        notes = duckdb.connect(str(db)).execute("SELECT patient_key, text FROM silver.note").df()
+        with duckdb.connect(str(db)) as con:
+            notes = con.execute("SELECT patient_key, text FROM silver.note").df()
         print(f"loaded {load_notes(notes)} note embeddings into {TABLE}")
     elif cmd == "query":
         q = argv[1] if len(argv) > 1 else "low back pain worse with sitting"
