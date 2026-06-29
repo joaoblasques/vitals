@@ -47,13 +47,20 @@ resources:
           - ${var.alert_email}
       notification_settings:
         no_alert_for_skipped_runs: true
-      # Serverless environment carrying the dbt adapter for the dbt task.
+      # Serverless environments: one carrying the dbt adapter (gold task), one carrying numpy/pandas
+      # for the drift task's PSI math (the spark_python_task runs on serverless compute).
       environments:
         - environment_key: dbt_env
           spec:
             client: "2"
             dependencies:
               - dbt-databricks>=1.8
+        - environment_key: py_env
+          spec:
+            client: "2"
+            dependencies:
+              - numpy
+              - pandas
       tasks:
         # Gold: rebuild the dbt marts on Unity Catalog + run the 26 dbt tests as quality gates.
         - task_key: gold_dbt
@@ -67,3 +74,17 @@ resources:
             commands:
               - "dbt build --target databricks_cluster"
             warehouse_id: e2d0993979faf3d2
+        # Monitoring: PSI feature-drift on the fresh marts -> vitals_gold.monitoring.drift_report.
+        # Downstream of gold so it scores fresh data; on the same schedule so drift is checked every
+        # time the data moves, not by a side process that rots. The script reads the SAME drift math
+        # the local monitor + unit tests use (src/ is synced by the bundle and imported on-cluster).
+        - task_key: drift_monitor
+          depends_on:
+            - task_key: gold_dbt
+          environment_key: py_env
+          spark_python_task:
+            python_file: ./pipelines/drift_job.py
+            # Pass the bundle's synced files root so the script can import the shared src/ (serverless
+            # runs the file via exec(), so __file__ is unbound — argv is the reliable locator).
+            parameters:
+              - ${workspace.file_path}

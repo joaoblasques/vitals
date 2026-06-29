@@ -66,3 +66,25 @@ different phase.
 - **Open follow-up:** promote bronze/silver into the job as a `python_wheel_task` (needs ambient
   serverless Spark via `DatabricksSession.builder.getOrCreate()`, a writable generate dir, and
   volume upload from the job) for a single full-medallion scheduled run.
+
+## Update (2026-06-29) — the job is *operated*, not just shipped
+
+Two ops additions so the deployed job behaves like something a real shop runs unattended:
+
+- **Failure alerts.** Job-level `email_notifications.on_failure` pages a recipient when a run fails
+  (a job that fails silently isn't operated). Recipient defaults to the deploying user via
+  `${workspace.current_user.userName}` — **no address committed to this public repo** (same no-PII
+  pattern as the Terraform UC grants); override with `BUNDLE_VAR_alert_email` / `--var`.
+  `notification_settings.no_alert_for_skipped_runs` keeps the paused demo from spamming.
+- **Drift monitoring as a job task.** A `drift_monitor` task (`spark_python_task`,
+  `pipelines/drift_job.py`) runs **downstream of `gold_dbt`** on the same schedule, so PSI
+  feature-drift is scored every time the data moves — not by a side process that rots. It reads the
+  fresh gold marts, computes the 8 monitored features with the **same SQL semantics** as the local
+  `FEATURE_SQL`, and appends a tidy history to `vitals_gold.monitoring.drift_report`
+  (`split, feature, psi, band, is_alert, run_ts`). The PSI math lives in `vitals.drift` (numpy/pandas
+  only, no duckdb) and is imported on-cluster from the bundle-synced `src/`, so the local monitor,
+  the connect/parity path, and the job all run **one implementation**. Verified two ways: a unit test
+  pins `build_report` to the committed `drift_report.json`, and `make drift-databricks` confirms all
+  16 `(split.feature)` PSI values match the local monitor to 4 dp.
+- **Free-Edition note:** serverless `spark_python_task` needs an `environment_key` (a serverless
+  `environments` entry); a dedicated `py_env` (numpy/pandas) carries the drift task.

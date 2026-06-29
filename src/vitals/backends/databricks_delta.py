@@ -51,6 +51,11 @@ GOLD_SCHEMA = "marts"
 GOLD_BASELINE = ROOT / "data" / "gold_baseline.json"
 LOCAL_DB = ROOT / "data" / "vitals.duckdb"
 
+# Monitoring: PSI drift on the gold marts, landed in vitals_gold.monitoring.drift_report.
+MONITORING_SCHEMA = "monitoring"
+DRIFT_TABLE = "drift_report"
+DRIFT_BASELINE = ROOT / "data" / "drift_report.json"  # local monitor output (parity baseline)
+
 
 # ---- pure logic (unit-testable, no I/O) -------------------------------------------------------
 
@@ -302,6 +307,119 @@ def main_silver() -> None:
         raise SystemExit(1)
 
 
+# ---- monitoring: PSI drift on the gold marts -> vitals_gold.monitoring.drift_report -----------
+
+# The 8 MONITORED features per patient, computed from the gold marts with the SAME semantics as the
+# local FEATURE_SQL (vitals.serve): inner-join on observations (a patient must have measurements),
+# left-join the rest, claims coalesced to 0. Spark dialect — FILTER (WHERE ...) is supported on UC.
+DRIFT_FEATURE_SQL = f"""
+WITH obs AS (
+    SELECT patient_key,
+        avg(value_std) FILTER (WHERE metric = 'pain')      AS mean_pain,
+        avg(value_std) FILTER (WHERE metric = 'adherence') AS mean_adherence,
+        avg(value_std) FILTER (WHERE metric = 'glucose')   AS mean_glucose_mgdl
+    FROM {GOLD_CATALOG}.{GOLD_SCHEMA}.fct_observation GROUP BY 1
+),
+clm AS (
+    SELECT patient_key, sum(coalesce(paid, 0)) AS total_paid
+    FROM {GOLD_CATALOG}.{GOLD_SCHEMA}.fct_claim GROUP BY 1
+),
+pro AS (
+    SELECT patient_key, avg(score) AS mean_odi
+    FROM {GOLD_CATALOG}.{GOLD_SCHEMA}.fct_pro GROUP BY 1
+),
+wbl AS (
+    SELECT patient_key, avg(steps) AS mean_steps, avg(active_minutes) AS mean_active_min
+    FROM {GOLD_CATALOG}.{GOLD_SCHEMA}.fct_wearable_daily GROUP BY 1
+)
+SELECT d.patient_key, d.age,
+       o.mean_pain, o.mean_adherence, o.mean_glucose_mgdl,
+       coalesce(clm.total_paid, 0) AS total_paid,
+       pro.mean_odi, wbl.mean_steps, wbl.mean_active_min
+FROM {GOLD_CATALOG}.{GOLD_SCHEMA}.dim_patient d
+JOIN obs o USING (patient_key)
+LEFT JOIN clm USING (patient_key)
+LEFT JOIN pro USING (patient_key)
+LEFT JOIN wbl USING (patient_key)
+"""
+
+
+def drift_rows(report: dict) -> list[tuple]:
+    """Flatten the nested drift report into tidy (split, feature, psi, band, is_alert) rows —
+    the shape a monitoring dashboard actually queries. Pure, so it's unit-testable."""
+    rows = []
+    for split in ("stable_split", "shifted_population"):
+        for feat, v in report[split].items():
+            rows.append((split, feat, float(v["psi"]), v["band"], v["band"] != "stable"))
+    return rows
+
+
+def write_drift(spark, report: dict) -> int:
+    """Append the drift report as tidy rows to vitals_gold.monitoring.drift_report; return row count.
+
+    Append-only history: each run is a point-in-time snapshot stamped run_ts server-side, so the
+    table is a drift time series you can trend — not a single overwritten row."""
+    from pyspark.sql.functions import current_timestamp
+    from pyspark.sql.types import (BooleanType, DoubleType, StringType, StructField, StructType)
+
+    schema = StructType([
+        StructField("split", StringType(), False),
+        StructField("feature", StringType(), False),
+        StructField("psi", DoubleType(), False),
+        StructField("band", StringType(), False),
+        StructField("is_alert", BooleanType(), False),
+    ])
+    df = spark.createDataFrame(drift_rows(report), schema).withColumn("run_ts", current_timestamp())
+    df.write.mode("append").saveAsTable(f"{GOLD_CATALOG}.{MONITORING_SCHEMA}.{DRIFT_TABLE}")
+    return df.count()
+
+
+def build_drift(spark) -> dict:
+    """Compute PSI drift from the gold marts and append it to the monitoring table.
+
+    Engine-agnostic: the caller passes the SparkSession (databricks-connect for the dev/parity path,
+    the ambient serverless session on the scheduled job). The PSI math is `vitals.drift.build_report`
+    — the exact same code the local monitor runs, so the two can't diverge."""
+    from vitals.drift import build_report
+
+    feats = spark.sql(DRIFT_FEATURE_SQL).toPandas()
+    report = build_report(feats)
+    report["_rows_written"] = write_drift(spark, report)
+    return report
+
+
+def drift_baseline() -> dict:
+    """The local monitor's drift_report.json — the parity baseline (run `make monitor` to refresh)."""
+    return json.loads(DRIFT_BASELINE.read_text())
+
+
+def drift_parity(local: dict, remote: dict, tol: float = 1e-3) -> dict[str, dict]:
+    """Compare PSI per (split.feature) between the local monitor and the Databricks run.
+
+    Same underlying data (gold parity already verified), same PSI math — so values should match
+    within floating-point tolerance across the DuckDB vs Spark aggregation of the features."""
+    report = {}
+    for split in ("stable_split", "shifted_population"):
+        keys = set(local.get(split, {})) | set(remote.get(split, {}))
+        for feat in sorted(keys):
+            lp = local.get(split, {}).get(feat, {}).get("psi")
+            rp = remote.get(split, {}).get(feat, {}).get("psi")
+            match = lp is not None and rp is not None and abs(lp - rp) <= tol
+            report[f"{split}.{feat}"] = {"local": lp, "remote": rp, "match": match}
+    return report
+
+
+def main_drift() -> None:
+    print(f"[drift] PSI on {GOLD_CATALOG}.{GOLD_SCHEMA} -> "
+          f"{GOLD_CATALOG}.{MONITORING_SCHEMA}.{DRIFT_TABLE} ...")
+    remote = build_drift(_spark())
+    print(f"  wrote {remote['_rows_written']} rows; alerts: {remote['alerts']}")
+    ok = _print_parity("psi (split.feature)", drift_parity(drift_baseline(), remote))
+    print(f"\n{'✅ drift parity: PSI matches the local monitor' if ok else '❌ drift parity FAILED'}")
+    if not ok:
+        raise SystemExit(1)
+
+
 def main() -> None:
     stage = sys.argv[1] if len(sys.argv) > 1 else "bronze"
     if stage == "bronze":
@@ -312,11 +430,14 @@ def main() -> None:
         main_gold()
     elif stage == "gold-baseline":
         write_local_gold_baseline()
+    elif stage == "drift":
+        main_drift()
     elif stage == "all":
         main_bronze()
         main_silver()
     else:
-        raise SystemExit(f"unknown stage {stage!r} (use: bronze | silver | gold | gold-baseline | all)")
+        raise SystemExit(
+            f"unknown stage {stage!r} (use: bronze | silver | gold | gold-baseline | drift | all)")
 
 
 if __name__ == "__main__":
