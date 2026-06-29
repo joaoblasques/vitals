@@ -1,4 +1,4 @@
-.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run
+.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -59,6 +59,20 @@ bundle-deploy:  ## deploy the Asset Bundle job to Databricks (run `source infra/
 
 bundle-run:     ## trigger the deployed gold-refresh job and wait (run `source infra/terraform/.env` first)
 	databricks bundle run vitals_medallion
+
+rag-up:         ## start the local pgvector serving store (Docker) + wait until healthy
+	docker compose up -d pgvector
+	@until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$(docker compose ps -q pgvector))" = "healthy" ]; do sleep 1; done
+	@echo "pgvector healthy on localhost:5432"
+
+rag-down:       ## stop + remove the pgvector store
+	docker compose down
+
+rag-load:       ## embed silver.note -> pgvector (needs `uv sync --extra vector` + rag-up)
+	PYTHONPATH=src ./.venv/bin/python -m vitals.vector_index load
+
+rag-query:      ## ANN query the store: make rag-query Q="low back pain"
+	PYTHONPATH=src ./.venv/bin/python -m vitals.vector_index query "$(Q)"
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

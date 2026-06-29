@@ -13,6 +13,8 @@ Run: `make rag-up`, then `python -m vitals.vector_index load` / `... query "low 
 from __future__ import annotations
 
 import hashlib
+import os
+import sys
 
 MODEL = "BAAI/bge-small-en-v1.5"
 DIM = 384
@@ -59,3 +61,126 @@ def shape_matches(rows: list[tuple]) -> list[dict]:
         {"patient_key": pk, "score": round(float(score), 3), "note": text[:160]}
         for pk, text, score in rows
     ]
+
+
+# ---- I/O (lazy imports: fastembed / psycopg / pgvector) ---------------------------------------
+
+_EMBEDDER = None
+
+
+def _embedder():
+    global _EMBEDDER
+    if _EMBEDDER is None:
+        from fastembed import TextEmbedding
+        _EMBEDDER = TextEmbedding(model_name=MODEL)
+    return _EMBEDDER
+
+
+def embed_documents(texts):
+    """Document embeddings (numpy arrays, 384-d) for the given texts."""
+    return list(_embedder().embed(list(texts)))
+
+
+def embed_query(text: str):
+    """Query embedding (BGE uses a query prefix via query_embed)."""
+    return list(_embedder().query_embed(text))[0]
+
+
+def _conn_kwargs() -> dict:
+    return {
+        "host": os.getenv("PGHOST", "localhost"),
+        "port": int(os.getenv("PGPORT", "5432")),
+        "user": os.getenv("PGUSER", "vitals"),
+        "password": os.getenv("PGPASSWORD", "vitals"),
+        "dbname": os.getenv("PGDATABASE", "vitals"),
+    }
+
+
+def connect():
+    """psycopg 3 connection with the pgvector type adapter registered."""
+    import psycopg
+    from pgvector.psycopg import register_vector
+
+    conn = psycopg.connect(**_conn_kwargs())
+    conn.execute("CREATE EXTENSION IF NOT EXISTS vector")  # adapter needs the type to exist
+    conn.commit()
+    register_vector(conn)
+    return conn
+
+
+def is_available() -> bool:
+    """True if a Postgres is reachable (drives serve.py's fallback). Fails fast when Docker is down."""
+    try:
+        import psycopg
+    except ModuleNotFoundError:
+        return False
+    try:
+        with psycopg.connect(**_conn_kwargs(), connect_timeout=3) as conn:
+            conn.execute("SELECT 1")
+        return True
+    except Exception:
+        return False
+
+
+def load_notes(df) -> int:
+    """Embed + upsert notes into pgvector; return the table row count. Idempotent (note_id PK)."""
+    df = df.drop_duplicates(subset="text").reset_index(drop=True)
+    texts, keys = df["text"].tolist(), df["patient_key"].tolist()
+    vectors = embed_documents(texts)
+    rows = [(note_id(k, t), k, t, v) for k, t, v in zip(keys, texts, vectors)]
+    conn = connect()
+    try:
+        for stmt in ddl():
+            conn.execute(stmt)
+        conn.commit()
+        with conn.cursor() as cur:
+            cur.executemany(upsert_sql(), rows)
+        conn.commit()
+        n = conn.execute(f"SELECT count(*) FROM {TABLE}").fetchone()[0]
+    finally:
+        conn.close()
+    return int(n)
+
+
+def query(text: str, k: int = TOPK) -> list[dict]:
+    """Embed the query and return the top-k nearest notes by cosine similarity."""
+    q = embed_query(text)
+    conn = connect()
+    try:
+        rows = conn.execute(query_sql(k), (q, q)).fetchall()
+    finally:
+        conn.close()
+    return shape_matches(rows)
+
+
+def rag_demo(notes_df, queries: list[str]) -> dict:
+    """serve.py entrypoint: load notes, run the demo queries, return the serving result shape."""
+    n = load_notes(notes_df)
+    return {
+        "n_notes_indexed": n,
+        "embedding": f"{MODEL} (pgvector, cosine)",
+        "dim": DIM,
+        "demo_queries": [{"query": q, "matches": query(q)} for q in queries],
+    }
+
+
+def main(argv: list[str] | None = None) -> None:
+    import json
+
+    argv = sys.argv[1:] if argv is None else argv
+    cmd = argv[0] if argv else "load"
+    if cmd == "load":
+        import duckdb
+        from pathlib import Path
+        db = Path(__file__).resolve().parents[2] / "data" / "vitals.duckdb"
+        notes = duckdb.connect(str(db)).execute("SELECT patient_key, text FROM silver.note").df()
+        print(f"loaded {load_notes(notes)} note embeddings into {TABLE}")
+    elif cmd == "query":
+        q = argv[1] if len(argv) > 1 else "low back pain worse with sitting"
+        print(json.dumps({"query": q, "matches": query(q)}, indent=2))
+    else:
+        raise SystemExit('usage: python -m vitals.vector_index load | query "<text>"')
+
+
+if __name__ == "__main__":
+    main()

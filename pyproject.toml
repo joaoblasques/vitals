@@ -23,6 +23,8 @@ databricks = ["pyspark>=3.5", "dbt-databricks>=1.8"]
 # pyspark, so install one OR the other in a given environment, never both.
 databricks-connect = ["databricks-connect==17.3.*"]
 feast = ["feast>=0.40"]
+# Vector index serving store — local pgvector (Docker) + fastembed embeddings (ADR 0006).
+vector = ["fastembed>=0.3", "psycopg[binary]>=3.1", "pgvector>=0.3"]
 dev = ["ruff", "pytest"]
 
 [tool.setuptools.packages.find]
@@ -31,6 +33,10 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.uv]
+# Ensure uv resolves wheels compatible with macOS x86_64 (Homebrew Intel / Rosetta).
+required-environments = ["sys_platform == 'darwin' and platform_machine == 'x86_64'"]
 
 [tool.ruff]
 target-version = "py312"

@@ -1,0 +1,16 @@
+# Local pgvector serving store — the gold vector index (ADR 0006). `make rag-up` to start.
+# Dev-only credentials, NOT secrets; override via PG* env vars. Ephemeral (reloads are idempotent).
+services:
+  pgvector:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: vitals
+      POSTGRES_PASSWORD: vitals
+      POSTGRES_DB: vitals
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vitals -d vitals"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
