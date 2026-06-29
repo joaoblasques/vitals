@@ -29,7 +29,7 @@ Key choices:
   they do not affect parity (all queries group by `patient__primary_condition`, not by date).
 
 ## Consequences
-- New `metrics` dependency group (`dbt-metricflow[duckdb]`); not core. `make metrics-validate` /
+- New `metrics` dependency group (`dbt-metricflow`); not core. `make metrics-validate` /
   `metrics-list` / `metrics-query` drive it.
 - The semantic YAML is adapter-agnostic — it would run against the Databricks target too — but
   exercising MetricFlow on Databricks is out of scope (local DuckDB is the deliverable).

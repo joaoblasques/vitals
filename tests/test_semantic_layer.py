@@ -63,6 +63,7 @@ def test_metric_matches_mart(metric, tmp_path):
     table, col, decimals = CASES[metric]
     sl = _mf_query(metric, tmp_path / f"{metric}.csv")
     mart = _mart_values(table, col)
+    assert mart, f"{table}.{col} returned no rows — mart not built? run `make build`"
     assert set(sl) == set(mart), f"{metric}: condition groups differ"
     for cond, mart_val in mart.items():
         assert round(sl[cond], decimals) == mart_val, (
