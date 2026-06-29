@@ -26,3 +26,11 @@ models:
     columns:
       - name: primary_condition
         tests: [not_null]
+  - name: fct_patient_metrics
+    description: Per-patient analytics base (one row per patient) — shared by the marts + semantic layer.
+    columns:
+      - name: patient_key
+        tests: [unique, not_null]
+      - name: surgery_90d
+        tests:
+          - accepted_values: {values: [0, 1]}
