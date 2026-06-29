@@ -23,7 +23,7 @@ select d.patient_key,
        coalesce(c.total_paid, 0)  as total_paid,
        coalesce(c.had_imaging, 0) as had_imaging,
        coalesce(c.denial_rate, 0) as denial_rate,
-       current_date::date          as metric_date   -- snapshot date; required by MetricFlow agg_time_dimension
+       date '2026-01-01'           as metric_date  -- deterministic snapshot date for the synthetic cohort (MetricFlow agg_time_dimension)
 from {{ ref('dim_patient') }} d
 left join obs o using (patient_key)
 left join clm c using (patient_key)

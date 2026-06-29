@@ -4328,7 +4328,7 @@ requires-dist = [
     { name = "databricks-connect", marker = "extra == 'databricks-connect'", specifier = "==17.3.*" },
     { name = "dbt-databricks", marker = "extra == 'databricks'", specifier = ">=1.8" },
     { name = "dbt-duckdb", specifier = ">=1.8" },
-    { name = "dbt-metricflow", extras = ["duckdb"], marker = "extra == 'metrics'" },
+    { name = "dbt-metricflow", marker = "extra == 'metrics'" },
     { name = "duckdb", specifier = ">=1.1" },
     { name = "fastembed", marker = "extra == 'vector'", specifier = ">=0.3" },
     { name = "feast", marker = "extra == 'feast'", specifier = ">=0.40" },
