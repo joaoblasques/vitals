@@ -30,7 +30,7 @@ different things:
 
 | Output | Tech | Serves |
 |---|---|---|
-| **Analytics marts** | dbt (Kimball star) + semantic layer | BI, cohorts, clinical/commercial reporting |
+| **Analytics marts** | dbt (Kimball star) + MetricFlow semantic layer | BI, cohorts, reporting (`make metrics-query` for composable metrics) |
 | **Feature store** | Feast (offline + online) | surgery-risk / adherence ML models |
 | **Vector index** | pgvector | RAG / semantic search over clinical notes (`make rag-up` for the real store; TF-IDF fallback otherwise) |
 
