@@ -1,6 +1,6 @@
 # Design — Hermetic CI quality gate (lint · tests · DQ contracts)
 
-_Date: 2026-06-29 · Status: DRAFT — approved design, not yet implemented · Phase: ops-hardening (follows the bundle alerts + drift-task unit)_
+_Date: 2026-06-29 · Status: DONE — shipped `5dac932`, CI run `28370097570` green on the runner (26 dbt tests ran) · Phase: ops-hardening (follows the bundle alerts + drift-task unit)_
 
 > **One-liner:** every push/PR runs the can't-skip checks — `ruff`, the pytest suite, and the local
 > data pipeline whose PHI boundary + 26 dbt tests are hard gates — on DuckDB, with **no credentials**.
