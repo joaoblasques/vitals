@@ -76,7 +76,10 @@ resources:
         # the ambient PySpark/SDK the bronze/silver landing needs available on-cluster.
         - environment_key: ingest_env
           spec:
-            client: "2"
+            # client "3" = Python 3.12 (vs "2" = 3.11) — the wheel requires-python is >=3.12, so the
+            # ingest env must be the 3.12 serverless runtime or the wheel won't install. dbt/py envs
+            # stay on "2" (they install no 3.12-only wheel).
+            client: "3"
             dependencies:
               - ./dist/*.whl
       tasks:
