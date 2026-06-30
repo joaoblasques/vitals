@@ -21,6 +21,15 @@ variables:
       source) or `databricks bundle deploy --var alert_email=...`.
     default: ${workspace.current_user.userName}
 
+# Build the project wheel at deploy time so the medallion task can ship bronze/silver code to the
+# job (ADR 0005). `uv build --wheel` emits ./dist/vitals-<version>-py3-none-any.whl; the ingest
+# environment installs it from there.
+artifacts:
+  vitals_wheel:
+    type: whl
+    build: uv build --wheel
+    path: .
+
 targets:
   dev:
     mode: development
@@ -61,9 +70,32 @@ resources:
             dependencies:
               - numpy
               - pandas
+        # Ingest task env: the project wheel itself (built by the `vitals_wheel` artifact above).
+        # On serverless the wheel attaches via the environment's dependencies (not task `libraries`,
+        # which is classic-cluster only); installing it makes the `vitals-medallion` entry point +
+        # the ambient PySpark/SDK the bronze/silver landing needs available on-cluster.
+        - environment_key: ingest_env
+          spec:
+            client: "2"
+            dependencies:
+              - ./dist/*.whl
       tasks:
+        # Ingest: the whole pre-gold medallion as ONE packaged task (generate synthetic data -> land
+        # bronze Delta -> build de-identified silver Delta, with the PHI + non-empty gates). It's the
+        # wheel's `vitals-medallion` entry point; generate/bronze/silver share one PySpark process +
+        # session and hand data off in-process, so they're one task. The writable bronze dir is passed
+        # as a parameter (/tmp on serverless). Runs first; gold + drift run downstream.
+        - task_key: medallion_ingest
+          environment_key: ingest_env
+          python_wheel_task:
+            package_name: vitals
+            entry_point: vitals-medallion
+            parameters:
+              - /tmp/vitals_bronze
         # Gold: rebuild the dbt marts on Unity Catalog + run the 26 dbt tests as quality gates.
         - task_key: gold_dbt
+          depends_on:
+            - task_key: medallion_ingest
           environment_key: dbt_env
           dbt_task:
             project_directory: ./dbt
