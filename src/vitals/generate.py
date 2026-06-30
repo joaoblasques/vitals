@@ -16,11 +16,11 @@ import json
 import random
 from dataclasses import dataclass
 from datetime import date, timedelta
-from pathlib import Path
+
+from vitals import env
 
 SEED = 42
 N_PATIENTS = 600
-BRONZE = Path(__file__).resolve().parents[2] / "data" / "bronze"
 
 FIRST = ["Maria", "João", "Ana", "Pedro", "Sofia", "Miguel", "Inês", "Tiago", "Rita", "Hugo"]
 LAST = ["Silva", "Santos", "Ferreira", "Costa", "Oliveira", "Rodrigues", "Martins", "Sousa"]
@@ -76,7 +76,8 @@ def _round(x: float, nd: int = 1) -> float:
 
 def generate() -> dict[str, int]:
     rng = random.Random(SEED)
-    BRONZE.mkdir(parents=True, exist_ok=True)
+    out = env.bronze_dir()
+    out.mkdir(parents=True, exist_ok=True)
     ids = Counter()
 
     patients, encounters, conditions, observations, notes = [], [], [], [], []
@@ -262,7 +263,7 @@ def _obs(ids, pid, ed, code, display, value, unit, rng):
 
 
 def _write(name: str, rows: list[dict]) -> None:
-    p = BRONZE / f"{name}.ndjson"
+    p = env.bronze_dir() / f"{name}.ndjson"
     with p.open("w") as f:
         for r in rows:
             f.write(json.dumps(r) + "\n")

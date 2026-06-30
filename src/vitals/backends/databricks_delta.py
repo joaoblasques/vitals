@@ -18,10 +18,10 @@ import json
 import sys
 from pathlib import Path
 
+from vitals import env
 from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
 
 ROOT = Path(__file__).resolve().parents[3]
-BRONZE_DIR = ROOT / "data" / "bronze"
 SILVER_BASELINE = ROOT / "data" / "silver_baseline.json"  # written by vitals.lakehouse
 
 CATALOG = "vitals_bronze"
@@ -80,7 +80,7 @@ def local_counts() -> dict[str, int]:
     """Row count per source from the local NDJSON (the bronze parity baseline)."""
     counts = {}
     for name in SOURCES:
-        path = BRONZE_DIR / f"{name}.ndjson"
+        path = env.bronze_dir() / f"{name}.ndjson"
         with path.open("rb") as fh:
             counts[name] = sum(1 for _ in fh)
     return counts
@@ -89,9 +89,11 @@ def local_counts() -> dict[str, int]:
 # ---- I/O (requires a live workspace) ----------------------------------------------------------
 
 def _spark():
+    if env.spark_mode() == "ambient":
+        from databricks.connect import DatabricksSession
+        return DatabricksSession.builder.getOrCreate()        # ON Databricks: ambient serverless session
     from databricks.connect import DatabricksSession
-
-    return DatabricksSession.builder.serverless().getOrCreate()
+    return DatabricksSession.builder.serverless().getOrCreate()  # connect from laptop (unchanged)
 
 
 def _upload_landing() -> None:
@@ -100,7 +102,7 @@ def _upload_landing() -> None:
 
     w = WorkspaceClient()
     for name in SOURCES:
-        local = BRONZE_DIR / f"{name}.ndjson"
+        local = env.bronze_dir() / f"{name}.ndjson"
         with local.open("rb") as fh:
             w.files.upload(f"{VOLUME_PATH}/{name}.ndjson", fh, overwrite=True)
 
