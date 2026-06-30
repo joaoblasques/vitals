@@ -13,6 +13,8 @@ from range(
     interval '1 day'
 )
 {% else %}
+-- Spark sequence() is stop-INCLUSIVE; DuckDB range() above is stop-EXCLUSIVE — so end at 2029-12-31
+-- to produce the identical day set (… through 2029-12-31), not one extra day.
 select
-    explode(sequence(date '2000-01-01', date '2030-01-01', interval 1 day)) as date_day
+    explode(sequence(date '2000-01-01', date '2029-12-31', interval 1 day)) as date_day
 {% endif %}

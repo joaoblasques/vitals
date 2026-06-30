@@ -7,13 +7,12 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-_DEFAULT_BRONZE = Path(__file__).resolve().parents[2] / "data" / "bronze"
-
 
 def bronze_dir() -> Path:
     """Directory for raw NDJSON. Default = repo data/bronze (local + connect unchanged); the bundle's
     medallion task overrides it to a writable /tmp dir via VITALS_BRONZE_DIR."""
-    return Path(os.environ.get("VITALS_BRONZE_DIR", str(_DEFAULT_BRONZE)))
+    default = Path(__file__).resolve().parents[2] / "data" / "bronze"
+    return Path(os.environ.get("VITALS_BRONZE_DIR", str(default)))
 
 
 def spark_mode() -> str:

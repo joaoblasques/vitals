@@ -89,10 +89,10 @@ def local_counts() -> dict[str, int]:
 # ---- I/O (requires a live workspace) ----------------------------------------------------------
 
 def _spark():
-    if env.spark_mode() == "ambient":
-        from databricks.connect import DatabricksSession
-        return DatabricksSession.builder.getOrCreate()        # ON Databricks: ambient serverless session
     from databricks.connect import DatabricksSession
+
+    if env.spark_mode() == "ambient":
+        return DatabricksSession.builder.getOrCreate()        # ON Databricks: ambient serverless session
     return DatabricksSession.builder.serverless().getOrCreate()  # connect from laptop (unchanged)
 
 

@@ -13,6 +13,12 @@ def test_assert_nonempty_raises_on_zero():
     assert "b" in str(e.value)
 
 
+def test_assert_nonempty_raises_on_negative():
+    with pytest.raises(AssertionError) as e:
+        medallion_job._assert_nonempty({"a": 1}, {"c": -1})
+    assert "c" in str(e.value)
+
+
 def test_main_sets_env_and_runs_stages_in_order(monkeypatch):
     calls = []
     monkeypatch.setattr("vitals.generate.generate", lambda: calls.append("generate") or {})
@@ -21,6 +27,7 @@ def test_main_sets_env_and_runs_stages_in_order(monkeypatch):
     monkeypatch.setattr(dx, "build_silver", lambda: (calls.append("build_silver") or {"patient": 5}))
     monkeypatch.setattr(dx, "silver_patient_columns", lambda: (calls.append("cols") or ["patient_key"]))
     monkeypatch.setattr(dx, "assert_no_phi", lambda cols: calls.append("assert_no_phi"))
+    monkeypatch.setattr(medallion_job, "_assert_nonempty", lambda b, s: calls.append("_assert_nonempty"))
 
     import os
     monkeypatch.delenv("VITALS_BRONZE_DIR", raising=False)
@@ -29,4 +36,6 @@ def test_main_sets_env_and_runs_stages_in_order(monkeypatch):
 
     assert os.environ["VITALS_BRONZE_DIR"] == "/tmp/vitals_bronze"
     assert os.environ["VITALS_SPARK_MODE"] == "ambient"
-    assert calls == ["generate", "land_bronze", "build_silver", "cols", "assert_no_phi"]
+    assert calls == [
+        "generate", "land_bronze", "build_silver", "cols", "assert_no_phi", "_assert_nonempty",
+    ]
