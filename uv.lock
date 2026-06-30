@@ -4288,7 +4288,7 @@ wheels = [
 [[package]]
 name = "vitals"
 version = "0.0.1"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "dbt-duckdb" },
     { name = "duckdb" },

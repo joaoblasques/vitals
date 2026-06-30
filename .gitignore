@@ -37,6 +37,11 @@ dbt/.user.yml
 # Databricks Asset Bundles (local deploy state)
 .databricks/
 
+# Python build artifacts (wheel build for the Databricks bundle)
+/dist/
+/build/
+*.egg-info/
+
 # Terraform
 infra/terraform/.terraform/
 *.tfstate
