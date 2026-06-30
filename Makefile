@@ -30,7 +30,7 @@ catalog:        ## Phase 4: regenerate the data dictionary + lineage from dbt
 	PYTHONPATH=src ./.venv/bin/python -m vitals.catalog
 
 test:           ## run the Python unit test suite
-	uv run --extra dev pytest tests/ -q
+	uv run --extra dev --extra local pytest tests/ -q
 
 dbcxn-setup:    ## create the databricks-connect venv (separate — conflicts with pyspark)
 	uv venv --python 3.12 .venv-dbcxn

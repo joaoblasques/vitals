@@ -4289,15 +4289,6 @@ wheels = [
 name = "vitals"
 version = "0.0.1"
 source = { editable = "." }
-dependencies = [
-    { name = "dbt-duckdb" },
-    { name = "duckdb" },
-    { name = "mlflow" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pyarrow" },
-    { name = "scikit-learn" },
-]
 
 [package.optional-dependencies]
 databricks = [
@@ -4314,6 +4305,15 @@ dev = [
 feast = [
     { name = "feast" },
 ]
+local = [
+    { name = "dbt-duckdb" },
+    { name = "duckdb" },
+    { name = "mlflow" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pyarrow" },
+    { name = "scikit-learn" },
+]
 metrics = [
     { name = "dbt-metricflow" },
 ]
@@ -4327,23 +4327,23 @@ vector = [
 requires-dist = [
     { name = "databricks-connect", marker = "extra == 'databricks-connect'", specifier = "==17.3.*" },
     { name = "dbt-databricks", marker = "extra == 'databricks'", specifier = ">=1.8" },
-    { name = "dbt-duckdb", specifier = ">=1.8" },
+    { name = "dbt-duckdb", marker = "extra == 'local'", specifier = ">=1.8" },
     { name = "dbt-metricflow", marker = "extra == 'metrics'" },
-    { name = "duckdb", specifier = ">=1.1" },
+    { name = "duckdb", marker = "extra == 'local'", specifier = ">=1.1" },
     { name = "fastembed", marker = "extra == 'vector'", specifier = ">=0.3" },
     { name = "feast", marker = "extra == 'feast'", specifier = ">=0.40" },
-    { name = "mlflow", specifier = ">=2.16" },
-    { name = "numpy", specifier = ">=1.26" },
-    { name = "pandas", specifier = ">=2.2" },
+    { name = "mlflow", marker = "extra == 'local'", specifier = ">=2.16" },
+    { name = "numpy", marker = "extra == 'local'", specifier = ">=1.26" },
+    { name = "pandas", marker = "extra == 'local'", specifier = ">=2.2" },
     { name = "pgvector", marker = "extra == 'vector'", specifier = ">=0.3" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'vector'", specifier = ">=3.1" },
-    { name = "pyarrow", specifier = ">=17" },
+    { name = "pyarrow", marker = "extra == 'local'", specifier = ">=17" },
     { name = "pyspark", marker = "extra == 'databricks'", specifier = ">=3.5" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
-    { name = "scikit-learn", specifier = ">=1.5" },
+    { name = "scikit-learn", marker = "extra == 'local'", specifier = ">=1.5" },
 ]
-provides-extras = ["databricks", "databricks-connect", "feast", "vector", "metrics", "dev"]
+provides-extras = ["local", "databricks", "databricks-connect", "feast", "vector", "metrics", "dev"]
 
 [[package]]
 name = "waitress"

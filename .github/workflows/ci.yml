@@ -42,7 +42,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
       - name: Install deps (from lock)
-        run: uv sync --extra dev
+        # `local` carries the MVP runtime stack (duckdb/dbt/mlflow/...) — core deps are empty so the
+        # medallion wheel stays slim on serverless; the hermetic gate needs the stack, hence --extra local.
+        run: uv sync --extra dev --extra local
       - name: Lint (ruff)
         run: uv run ruff check .
       - name: Unit tests (pytest)

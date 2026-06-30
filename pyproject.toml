@@ -4,8 +4,15 @@ version = "0.0.1"
 description = "From raw clinical signals to trusted, AI-ready data — a health-data medallion lakehouse."
 readme = "README.md"
 requires-python = ">=3.12"
-# Runnable local MVP stack (DuckDB lakehouse — clone & run, no cloud/Java needed).
-dependencies = [
+# Core is a LEAN library with no required third-party deps — so the wheel the medallion job ships to
+# serverless stays slim (the on-cluster bronze/silver task needs only ambient Spark, not the MVP stack).
+# The runnable local MVP stack lives in the `local` extra below (ADR 0005). Keep core empty.
+dependencies = []
+
+[project.optional-dependencies]
+# Runnable local MVP stack (DuckDB lakehouse + dbt + the MLflow/feature demo) — clone & run, no cloud
+# or Java needed. NOT installed on serverless (the wheel must not drag this onto the cluster).
+local = [
     "duckdb>=1.1",
     "dbt-duckdb>=1.8",
     "pandas>=2.2",
@@ -14,8 +21,6 @@ dependencies = [
     "scikit-learn>=1.5",
     "mlflow>=2.16",
 ]
-
-[project.optional-dependencies]
 # Deployment target (Databricks) + scale path (PySpark) — not needed to run the MVP.
 databricks = ["pyspark>=3.5", "dbt-databricks>=1.8"]
 # Delta-on-UC writer: runs Spark on Databricks serverless via Spark Connect (ADR 0005).
