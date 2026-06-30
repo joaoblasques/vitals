@@ -88,3 +88,36 @@ Two ops additions so the deployed job behaves like something a real shop runs un
   16 `(split.feature)` PSI values match the local monitor to 4 dp.
 - **Free-Edition note:** serverless `spark_python_task` needs an `environment_key` (a serverless
   `environments` entry); a dedicated `py_env` (numpy/pandas) carries the drift task.
+
+## Update (2026-06-30) — the open follow-up is closed: the job runs the full medallion
+
+Bronze + silver are now **in the job**: a single `python_wheel_task` (`medallion_ingest`, the wheel's
+`vitals-medallion` entry point) runs **generate → bronze Delta → silver Delta** with the PHI +
+non-empty gates, wired **before** `gold_dbt → drift_monitor`. One scheduled serverless run now does
+the whole medallion, no laptop. Verified `TERMINATED SUCCESS` (`bundle deploy && bundle run`):
+`medallion_ingest` (bronze=28816, silver=27402) → `gold_dbt` (marts + tests) → `drift_monitor`.
+
+- **One codebase, three homes.** `vitals/env.py` resolves two signals at call time — `VITALS_BRONZE_DIR`
+  (writable NDJSON dir; the job passes `/tmp/vitals_bronze`) and `VITALS_SPARK_MODE` (`ambient` on-cluster
+  vs `serverless` for connect). Defaults reproduce the original behaviour, so the connect dev path and
+  the DuckDB clone-and-run default are untouched.
+- **Single task by design.** generate/bronze/silver share one Python process + Spark session and hand
+  data off in-process → one task; gold (dbt on a SQL warehouse) and drift (pandas, after gold) are
+  different runtimes → separate tasks. Task boundaries follow the *runtime*, not the stage name.
+- **In-job gates:** PHI (`assert_no_phi`) + non-empty counts hard-fail the task on-cluster; the dbt
+  tests still gate gold. Cross-engine parity stays the dev/connect-time gate (no DuckDB on-cluster).
+- **Three Free-Edition serverless lessons learned the hard way (each surfaced only on a live run):**
+  1. **A wheel ships its dependencies.** With the MVP stack (duckdb/dbt/mlflow/…) in `[project]`
+     dependencies, the wheel dragged all of it onto serverless and broke. Fix: core `vitals` is a lean
+     library (empty required deps); the stack moved to a `local` extra — the on-cluster task needs only
+     ambient Spark. *Separate the library from its app-runtime deps.*
+  2. **Match the wheel's Python floor to the compute.** `requires-python>=3.12` won't install on
+     serverless env version "2" (Python 3.11). Fix: pin `ingest_env` to client **"3"** (Python 3.12)
+     rather than lowering the project floor (which broke local resolution).
+  3. **dbt models must be dialect-correct on the target you actually run.** `metricflow_time_spine`
+     used DuckDB `range(DATE,…)`; Spark's `range()` is integer-only. Fix: branch on `target.type`
+     (DuckDB `range()` / Spark `sequence()+explode()`). ADR 0007 had called the semantic layer
+     "Databricks-compatible but not exercised" — exercising it is what proved (and fixed) the gap.
+- **Ambient Spark on serverless:** `DatabricksSession.builder.getOrCreate()` (no `.serverless()`)
+  returns the ambient session inside the job; `WorkspaceClient().files.upload` writes the volume with
+  ambient job auth. Both verified by the `medallion_ingest` SUCCESS.

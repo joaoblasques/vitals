@@ -84,6 +84,10 @@ data-quality report (`data/dq_report.json`), a feature Parquet, an MLflow run, a
 
 > **Why DuckDB?** The MVP is built to *run* in one command. **Databricks/Delta** is the documented
 > deployment target and **PySpark** the Phase-3 scale path (`pip install -e '.[databricks]'`).
+>
+> **Production deploy:** `databricks bundle deploy && databricks bundle run vitals_medallion` runs the
+> **whole medallion** as one scheduled serverless job — generate → bronze → silver → gold → drift,
+> unattended, with the de-id PHI gate and dbt tests as in-job gates (ADR 0005).
 
 ## Status & roadmap
 

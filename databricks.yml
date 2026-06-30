@@ -39,10 +39,10 @@ resources:
   jobs:
     vitals_medallion:
       name: vitals-gold-refresh
-      # Currently ships the GOLD stage as a scheduled serverless job (dbt marts + the 26 dbt tests
-      # as in-job quality gates). Upstream bronze/silver run today via databricks-connect
-      # (make bronze-/silver-databricks); promoting them into this job is a documented follow-up
-      # (a python_wheel_task: ambient serverless Spark + generate to a writable dir + land to volume).
+      # Runs the FULL medallion as a scheduled serverless job: medallion_ingest (generate -> bronze
+      # Delta -> silver Delta, the wheel) -> gold_dbt (marts + dbt tests as gates) -> drift_monitor
+      # (PSI). Self-contained — no laptop. The databricks-connect path (make bronze-/silver-databricks)
+      # remains for interactive dev (ADR 0005: build with connect, ship with the bundle).
       # Daily refresh, PAUSED by default — this is a demo workspace; unpause to schedule for real.
       schedule:
         quartz_cron_expression: "0 0 6 * * ?"
