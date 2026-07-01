@@ -41,6 +41,10 @@ def expectations_spec() -> list[dict]:
         {"table": "pro", "type": "between", "column": "score", "min": PRO_MIN, "max": PRO_MAX},
         {"table": "wearable_daily", "type": "between", "column": "steps",
          "min": STEPS_MIN, "max": STEPS_MAX},
+        # Completeness: every silver table must have rows — otherwise the value/range/set expectations
+        # above pass VACUOUSLY on empty data and the gate would greenlight an empty silver.
+        *[{"table": t, "type": "row_count_min", "column": None}
+          for t in ("condition", "observation", "patient", "pro", "wearable_daily")],
     ]
 
 
@@ -51,11 +55,9 @@ def is_available() -> bool:
 
 def _read_silver() -> dict:
     import duckdb
-    con = duckdb.connect(str(DB))
-    tables = {t: con.execute(f"SELECT * FROM silver.{t}").df()
-              for t in ("condition", "observation", "patient", "pro", "wearable_daily")}
-    con.close()
-    return tables
+    with duckdb.connect(str(DB)) as con:
+        return {t: con.execute(f"SELECT * FROM silver.{t}").df()
+                for t in ("condition", "observation", "patient", "pro", "wearable_daily")}
 
 
 def _expectation(item: dict):
@@ -73,6 +75,8 @@ def _expectation(item: dict):
     if t == "columns_match_set":
         return gx.expectations.ExpectTableColumnsToMatchSet(
             column_set=item["column_set"], exact_match=True)
+    if t == "row_count_min":
+        return gx.expectations.ExpectTableRowCountToBeBetween(min_value=1)
     raise ValueError(f"unknown expectation type {t!r}")
 
 
