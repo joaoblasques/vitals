@@ -44,10 +44,13 @@ jobs:
       - name: Install deps (from lock)
         # `local` carries the MVP runtime stack (duckdb/dbt/mlflow/...) — core deps are empty so the
         # medallion wheel stays slim on serverless; the hermetic gate needs the stack, hence --extra local.
-        run: uv sync --extra dev --extra local
+        # `dq` adds great-expectations so the GE silver gate runs in CI.
+        run: uv sync --extra dev --extra local --extra dq
       - name: Lint (ruff)
         run: uv run ruff check .
       - name: Unit tests (pytest)
         run: uv run pytest -q
       - name: DQ gate — local pipeline (PHI boundary + 26 dbt tests)
         run: make build
+      - name: Great Expectations gate (silver DQ contract)
+        run: make dq
