@@ -76,7 +76,9 @@ def run() -> dict:
     feats = con.execute(FEATURE_SQL).df()
     con.execute("CREATE SCHEMA IF NOT EXISTS gold")
     con.execute("CREATE OR REPLACE TABLE gold.patient_features AS SELECT * FROM feats")
+    feats["event_timestamp"] = pd.Timestamp("2026-01-01", tz="UTC")   # Feast FileSource timestamp (ADR 0008)
     feats.to_parquet(GOLD / "patient_features.parquet", index=False)
+    feast_demo = _feature_store_demo()
 
     # ---------- 2. VECTOR INDEX + RAG demo ----------
     notes = con.execute("SELECT patient_key, text FROM silver.note").df()
@@ -94,9 +96,10 @@ def run() -> dict:
         "data_quality": json.loads((ROOT / "data" / "dq_report.json").read_text()),
         "feature_store": {
             "n_patients": int(len(feats)),
-            "features": [c for c in feats.columns if c not in ("patient_key", "surgery_90d")],
+            "features": [c for c in feats.columns if c not in ("patient_key", "surgery_90d", "event_timestamp")],
             "offline_table": "gold.patient_features",
             "parquet": "data/gold/patient_features.parquet",
+            **feast_demo,
         },
         "vector_index": rag,
         "model": model_metrics,
@@ -104,6 +107,18 @@ def run() -> dict:
     RESULTS.write_text(json.dumps(results, indent=2, default=str))
     print(json.dumps(results, indent=2, default=str))
     return results
+
+
+def _feature_store_demo() -> dict:
+    """Real Feast online + point-in-time historical retrieval when the `feast` extra is installed;
+    a skip note otherwise (offline parquet is always written above). See ADR 0008."""
+    try:
+        from vitals import feature_store as fs
+        if not fs.is_available():
+            return {"store": "feast (skipped: extra not installed)"}
+        return fs.demo()
+    except Exception as e:  # noqa: BLE001 — a demo must never break the pipeline
+        return {"store": f"feast (skipped: {e})"}
 
 
 def _rag_demo(notes: pd.DataFrame, queries: list[str]) -> dict:

@@ -1,4 +1,4 @@
-.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query metrics-validate metrics-list metrics-query
+.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -73,6 +73,9 @@ rag-load:       ## embed silver.note -> pgvector (needs `uv sync --extra vector`
 
 rag-query:      ## ANN query the store: make rag-query Q="low back pain"
 	PYTHONPATH=src ./.venv/bin/python -m vitals.vector_index query "$(Q)"
+
+feast-demo:     ## apply + materialize Feast (offline parquet -> sqlite online) + online/historical retrieval
+	PYTHONPATH=src ./.venv/bin/python -m vitals.feature_store demo
 
 metrics-validate:  ## validate the dbt Semantic Layer configs (needs `uv sync --extra metrics`)
 	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/mf validate-configs
