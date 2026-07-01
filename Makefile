@@ -1,4 +1,4 @@
-.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query
+.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query dq
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -85,6 +85,9 @@ metrics-list:      ## list the defined metrics
 
 metrics-query:     ## example: surgery rate + pain by condition (needs `make build` first)
 	cd dbt && DBT_PROFILES_DIR=. ../.venv/bin/mf query --metrics surgery_rate,avg_pain --group-by patient__primary_condition
+
+dq:             ## Great Expectations gate: validate the silver DQ contract (needs `uv sync --extra dq` + `make build`)
+	PYTHONPATH=src ./.venv/bin/python -m vitals.dq
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

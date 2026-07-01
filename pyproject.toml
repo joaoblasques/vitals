@@ -32,6 +32,9 @@ feast = ["feast>=0.40"]
 vector = ["fastembed>=0.3", "psycopg[binary]>=3.1", "pgvector>=0.3"]
 # Semantic layer — MetricFlow over the marts' star (ADR 0007); optional, not needed for the MVP.
 metrics = ["dbt-metricflow"]
+# Data-quality gate — Great Expectations validates the silver contract in CI (ADR 0009). A GATE (run in
+# CI), not an optional demo — but kept out of core so clone-and-run/`make run` stays lean.
+dq = ["great-expectations>=1.0"]
 dev = ["ruff", "pytest"]
 
 [build-system]

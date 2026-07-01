@@ -1,3 +1,8 @@
+import importlib.util
+
+import pandas as pd
+import pytest
+
 from vitals import dq
 
 
@@ -26,3 +31,28 @@ def test_glucose_unit_expectation_is_filtered_to_glucose():
     unit = next(e for e in spec if e["table"] == "observation" and e["column"] == "unit_std")
     assert unit["where"] == {"metric": "glucose"}
     assert unit["value_set"] == ["mg/dL"]
+
+
+@pytest.mark.skipif(
+    importlib.util.find_spec("great_expectations") is None,
+    reason="needs the `dq` extra (great-expectations); runs in CI where it's installed",
+)
+def test_validate_catches_a_bad_silver_batch():
+    """The gate must have teeth: an out-of-vocab icd10_code + a PHI column must fail validation."""
+    good = {
+        "condition": pd.DataFrame({"patient_key": ["p1"], "icd10_code": ["M54.5"]}),
+        "observation": pd.DataFrame({"patient_key": ["p1"], "metric": ["pain"], "unit_std": ["score"]}),
+        "patient": pd.DataFrame({"patient_key": ["p1"], "gender": ["m"], "age": [70], "_date_shift_days": [3]}),
+        "pro": pd.DataFrame({"patient_key": ["p1"], "score": [40]}),
+        "wearable_daily": pd.DataFrame({"patient_key": ["p1"], "steps": [8000]}),
+    }
+    assert dq.validate(good)["success"] is True
+
+    bad = {k: v.copy() for k, v in good.items()}
+    bad["condition"]["icd10_code"] = ["Z99.9"]            # not in the valid ICD-10 set
+    bad["patient"]["name"] = ["Jane Doe"]                 # a PHI column snuck in
+    result = dq.validate(bad)
+    assert result["success"] is False
+    failed = {(r["table"], r["type"]) for r in result["results"] if not r["success"]}
+    assert ("condition", "in_set") in failed
+    assert ("patient", "columns_match_set") in failed

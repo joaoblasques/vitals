@@ -42,3 +42,78 @@ def expectations_spec() -> list[dict]:
         {"table": "wearable_daily", "type": "between", "column": "steps",
          "min": STEPS_MIN, "max": STEPS_MAX},
     ]
+
+
+def is_available() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("great_expectations") is not None
+
+
+def _read_silver() -> dict:
+    import duckdb
+    con = duckdb.connect(str(DB))
+    tables = {t: con.execute(f"SELECT * FROM silver.{t}").df()
+              for t in ("condition", "observation", "patient", "pro", "wearable_daily")}
+    con.close()
+    return tables
+
+
+def _expectation(item: dict):
+    import great_expectations as gx
+    t, col = item["type"], item.get("column")
+    if t == "not_null":
+        return gx.expectations.ExpectColumnValuesToNotBeNull(column=col)
+    if t == "in_set":
+        return gx.expectations.ExpectColumnValuesToBeInSet(column=col, value_set=item["value_set"])
+    if t == "unique":
+        return gx.expectations.ExpectColumnValuesToBeUnique(column=col)
+    if t == "between":
+        return gx.expectations.ExpectColumnValuesToBeBetween(
+            column=col, min_value=item["min"], max_value=item["max"])
+    if t == "columns_match_set":
+        return gx.expectations.ExpectTableColumnsToMatchSet(
+            column_set=item["column_set"], exact_match=True)
+    raise ValueError(f"unknown expectation type {t!r}")
+
+
+def validate(silver: dict | None = None) -> dict:
+    """Run the silver expectation suite with GE (ephemeral context, one pandas batch per expectation —
+    filtered where a `where` clause is given, e.g. glucose-only unit check). Returns an aggregate result.
+    Pass `silver` (dict of table->DataFrame) to validate injected data; default reads the built silver."""
+    import great_expectations as gx
+    if silver is None:
+        silver = _read_silver()
+    ctx = gx.get_context(mode="ephemeral")
+    ds = ctx.data_sources.add_pandas("pandas")
+    results = []
+    for i, item in enumerate(expectations_spec()):
+        df = silver[item["table"]]
+        for k, v in item.get("where", {}).items():
+            df = df[df[k] == v]
+        asset = ds.add_dataframe_asset(name=f"a{i}_{item['table']}")
+        bd = asset.add_batch_definition_whole_dataframe(f"b{i}")
+        batch = bd.get_batch(batch_parameters={"dataframe": df})
+        res = batch.validate(_expectation(item))
+        results.append({
+            "table": item["table"], "type": item["type"],
+            "column": item.get("column") or "columns",
+            "success": bool(res.success),
+        })
+    n_failed = sum(1 for r in results if not r["success"])
+    return {"success": n_failed == 0, "n_expectations": len(results),
+            "n_failed": n_failed, "results": results}
+
+
+def main() -> None:
+    result = validate()
+    OUT.write_text(json.dumps(result, indent=2))
+    passed = result["n_expectations"] - result["n_failed"]
+    print(f"GE silver DQ: {passed}/{result['n_expectations']} expectations passed")
+    for r in result["results"]:
+        if not r["success"]:
+            print(f"  FAILED: {r['table']}.{r['column']} [{r['type']}]")
+    sys.exit(0 if result["success"] else 1)
+
+
+if __name__ == "__main__":
+    main()
