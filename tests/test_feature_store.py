@@ -1,7 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 import pytest
 
 from vitals import feature_store as fs
+
+_PARQUET = Path(__file__).resolve().parents[1] / "data" / "gold" / "patient_features.parquet"
 
 
 def test_features_are_the_eight_view_fields():
@@ -44,3 +48,31 @@ def test_parity_flags_a_perturbed_value():
     res = fs.parity(got, off, ["p1", "p2"])
     assert res["mean_pain"] is False
     assert res["all_match"] is False
+
+
+def test_parity_exactly_one_nan_is_mismatch():
+    """null-vs-value must flag as mismatch — the most dangerous silent-pass edge case."""
+    off = _offline()  # p2 has NaN for mean_glucose_mgdl
+    got = off[["patient_key", *fs.FEATURES]].copy()
+    # replace the NaN with a real value: offline=NaN, retrieved=real → must mismatch
+    got.loc[got["patient_key"] == "p2", "mean_glucose_mgdl"] = 99.9
+    res = fs.parity(got, off, ["p1", "p2"])
+    assert res["mean_glucose_mgdl"] is False
+    assert res["all_match"] is False
+
+
+# ---------------------------------------------------------------------------
+# Gated integration test — skips in CI (no feast extra) and when parquet is missing
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(
+    __import__("importlib.util", fromlist=["find_spec"]).find_spec("feast") is None
+    or not _PARQUET.exists(),
+    reason="needs the `feast` extra + `make run` (gated; skips in CI)",
+)
+def test_feast_online_and_historical_match_offline():
+    """Real Feast retrieval must reproduce the offline parquet (online + point-in-time historical).
+    Gated: skips in CI (no `feast` extra) and when the parquet isn't built."""
+    result = fs.demo(n=5)
+    assert result["online_parity"]["all_match"] is True, result["online_parity"]
+    assert result["historical_parity"]["all_match"] is True, result["historical_parity"]
