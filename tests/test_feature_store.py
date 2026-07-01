@@ -1,3 +1,4 @@
+import importlib.util
 from pathlib import Path
 
 import pandas as pd
@@ -61,13 +62,23 @@ def test_parity_exactly_one_nan_is_mismatch():
     assert res["all_match"] is False
 
 
+def test_parity_retrieved_null_but_offline_has_value_is_mismatch():
+    """The inverse (and operationally more dangerous) direction: Feast silently dropped a value and
+    returns null where the offline parquet had a real number — must flag as mismatch, never pass."""
+    off = _offline()
+    got = off[["patient_key", *fs.FEATURES]].copy()
+    got.loc[got["patient_key"] == "p1", "mean_pain"] = float("nan")  # offline=6.0, retrieved=NaN
+    res = fs.parity(got, off, ["p1", "p2"])
+    assert res["mean_pain"] is False
+    assert res["all_match"] is False
+
+
 # ---------------------------------------------------------------------------
 # Gated integration test — skips in CI (no feast extra) and when parquet is missing
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(
-    __import__("importlib.util", fromlist=["find_spec"]).find_spec("feast") is None
-    or not _PARQUET.exists(),
+    importlib.util.find_spec("feast") is None or not _PARQUET.exists(),
     reason="needs the `feast` extra + `make run` (gated; skips in CI)",
 )
 def test_feast_online_and_historical_match_offline():

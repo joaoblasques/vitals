@@ -18,6 +18,12 @@ feature parquet the pipeline already produces. Demonstrate the two things a feat
 Both are **parity-checked** against the offline parquet — the store must return the values the pipeline
 produced (NULL-aware, float-tolerant).
 
+**Honest scope of the PIT demo:** the offline source carries a **single snapshot per patient** (one
+`event_timestamp`), so the historical retrieval exercises the point-in-time *mechanism* (ttl window +
+timestamp join) and proves values round-trip, but it does not stress-test the leakage-prevention against
+*multiple* feature versions per entity (pick the latest row before `t`, exclude future rows). That
+deeper test would need a time-versioned feature source, which is out of this unit's scope.
+
 Key choices:
 - **Optional `feast` extra + graceful skip.** `serve.py` runs the demo only when Feast is installed
   (like the pgvector store); `make build` (`--no-serve`) never touches it, so clone-and-run and the
