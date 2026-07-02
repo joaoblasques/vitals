@@ -9,15 +9,20 @@ The silver layer earns its keep. Before/after on the same data:
 
 | Dimension | Bronze (raw) | Silver (clean) |
 |---|---|---|
-| Patient rows | 631 | **600** (31 exact duplicates removed) |
+| Patient rows | 629 | **600** (29 exact duplicates removed) |
 | Glucose units in use | **2** (mg/dL *and* mmol/L) | **1** (standardized to mg/dL) |
-| Conditions coded to ICD-10 | 79.5% | **100%** (123 recovered from free text) |
+| Conditions coded to ICD-10 | 81.3% | **100%** (112 recovered from free text) |
 | Observations missing a value | 3.9% | **0%** (completeness gate) |
-| Missing gender / birthdate | 9.2% / 4.8% | handled (PHI removed; age capped at 90) |
+| Missing gender / birthdate | 8.3% / 5.2% | handled (PHI removed; age capped at 90) |
 
 PHI (names, SSNs, addresses, full DOBs) is dropped at the silver boundary — a de-id assertion in
 the pipeline fails the build if any PHI column survives. Dates are shifted per-patient to preserve
 intervals (HIPAA Safe Harbor).
+
+**Great Expectations** gates silver in CI: 14 expectations validate coded-vocabulary value-sets
+(ICD-10 codes, LOINC observation metrics, RxNorm-standardized glucose units), PHI column boundaries,
+key integrity, and range checks — **14/14 pass** (`make dq`). A violation exits non-zero and fails
+the build. PSI feature-drift is scored on each production job run (see [Architecture](architecture.md)).
 
 ## 2. Analytics mart — `gold.mart_condition_outcomes`
 
@@ -35,23 +40,28 @@ dbt build: **3 models + 8 data tests, all passing** (uniqueness, not-null, accep
 
 ## 3. Feature store — `gold.patient_features`
 
-600 patients × **20 time-aware features spanning four source types** (offline table + Parquet;
-Feast repo in `ml/feature_store/`):
+600 patients × **20 time-aware features spanning four source types**, materialized into a live
+**Feast** store (sqlite online + file offline; `ml/feature_store/`):
 
 - **observations** — mean/last/trend pain, adherence, glucose, heart rate
 - **claims** — claim count, conservative-care spend, had-imaging, denial rate
 - **PRO** — Oswestry Disability Index (mean + latest)
 - **wearables** — mean steps, active minutes, resting HR, sleep
 
-The store holds all 20; the demo model below uses a curated, clinically-relevant subset (feature selection).
+Both store paths are parity-checked against the offline parquet: **`online_parity.all_match = true`**
+(`get_online_features` — low-latency inference path) and **`historical_parity.all_match = true`**
+(`get_historical_features` — point-in-time training join, leakage-safe). The store holds all 20;
+the demo model below uses a curated, clinically-relevant subset (feature selection).
 
 ## 4. Vector index + RAG
 
-399 clinical notes embedded via **fastembed bge-small-en-v1.5** (384-d) in a local **pgvector** store (HNSW cosine index); TF-IDF is the clone-and-run fallback when Docker is down.
+390 clinical notes indexed. **pgvector** (Docker, HNSW cosine, **fastembed bge-small-en-v1.5**
+384-d) is the real store when Docker is running (`make rag-up && make rag-index`); **TF-IDF** is
+the clone-and-run fallback when Docker is down. The demo below ran with TF-IDF.
 
 > **Query:** *"severe lower back pain worse with sitting, poor adherence"*
 > **Top match (0.69):** *"Patient reports severe lower back pain, worse with prolonged sitting.
-> Adherence to home program poor adherence. Plan: continue PT, reassess in 4 weeks."*
+> Adherence to home program poor adherence. Plan: continue PT, reassess in 8 weeks."*
 
 ## 5. Demo model — surgery-risk (tracked in MLflow)
 
@@ -64,10 +74,10 @@ Logistic regression on a curated 10-feature subset of the store, predicting `sur
 | Train / test | 450 / 150 |
 | Model features | 10 (curated from 20) |
 
-The learned coefficients are clinically coherent — **disability (ODI +0.72)**, **age (+0.64)**, and
-**pain** raise risk, while **activity (active minutes −0.74, steps)** lowers it — exactly the
-relationship Sword's care model is built on. Multi-source features (claims imaging, ODI, wearables)
-now sit among the top predictors.
+The learned coefficients are clinically coherent — **disability (ODI +0.72)**, **age (+0.64)**,
+and **pain** raise risk; **adherence (−0.21)** and **active minutes (−0.74)** lower it — exactly
+the relationship Sword's care model is built on. **Imaging (+0.29)** flags surgical candidates.
+Multi-source features (claims imaging, ODI, wearables) sit among the top predictors.
 
 ## 6. OMOP CDM (Phase 2)
 
@@ -111,9 +121,10 @@ dbt now totals **1 seed + 10 models + 26 data tests, all passing**.
 ## 8. Streaming + Spark at scale (Phase 3)
 
 Wearables arrive continuously in production, so they also run as a **Spark Structured Streaming**
-job — cleaning outliers on the fly and writing a checkpointed Parquet stream. The demo streams from
-a file source (no broker needed); **production swaps one line** to read from Kafka
-(`.readStream.format("kafka")`).
+job — cleaning outliers on the fly and writing a checkpointed Parquet stream. The stream reads from
+a **real local Kafka broker** (Docker, single-node KRaft) via `.readStream.format("kafka")`.
+Parity is proven: `make stream-parity` runs both the file-source path (no broker needed) and the
+Kafka path through the shared `clean_wearables` transform and asserts identical cleaned output.
 
 | | |
 |---|---:|
