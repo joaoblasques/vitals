@@ -35,6 +35,8 @@ metrics = ["dbt-metricflow"]
 # Data-quality gate — Great Expectations validates the silver contract in CI (ADR 0009). A GATE (run in
 # CI), not an optional demo — but kept out of core so clone-and-run/`make run` stays lean.
 dq = ["great-expectations>=1.0"]
+# Streaming — real Kafka source for the wearable feed (ADR 0010). Local Docker broker; not in CI.
+stream = ["kafka-python>=2.0", "pyspark>=3.5"]
 dev = ["ruff", "pytest"]
 
 [build-system]

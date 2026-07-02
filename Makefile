@@ -1,4 +1,4 @@
-.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query dq
+.PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query dq stream-up stream-down stream-produce stream-kafka stream-parity
 
 setup:          ## create venv + install the runnable MVP stack
 	uv venv --python 3.12
@@ -88,6 +88,23 @@ metrics-query:     ## example: surgery rate + pain by condition (needs `make bui
 
 dq:             ## Great Expectations gate: validate the silver DQ contract (needs `uv sync --extra dq` + `make build`)
 	PYTHONPATH=src ./.venv/bin/python -m vitals.dq
+
+stream-up:      ## start the local Kafka broker (Docker KRaft) + wait until healthy
+	docker compose up -d kafka
+	@until [ "$$(docker inspect -f '{{.State.Health.Status}}' $$(docker compose ps -q kafka))" = "healthy" ]; do sleep 2; done
+	@echo "kafka healthy on localhost:9092"
+
+stream-down:    ## stop the Kafka broker
+	docker compose stop kafka
+
+stream-produce: ## publish the wearable bronze events to the `wearables` Kafka topic
+	PYTHONPATH=src ./.venv/bin/python -m vitals.streaming produce
+
+stream-kafka:   ## consume `wearables` with Spark Structured Streaming -> cleaned parquet
+	PYTHONPATH=src ./.venv/bin/python -m vitals.streaming kafka
+
+stream-parity:  ## run BOTH sources (file + kafka) and assert identical cleaned output
+	PYTHONPATH=src ./.venv/bin/python -m vitals.streaming parity
 
 clean:          ## remove generated data + build artifacts
 	rm -rf data/bronze data/gold data/vitals.duckdb data/*.json dbt/target mlflow.db mlruns

@@ -1744,6 +1744,15 @@ wheels = [
 ]
 
 [[package]]
+name = "kafka-python"
+version = "3.0.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/72/539ad8b49893eaa32d24688541784a150b248832c8594741001243d1dee5/kafka_python-3.0.7.tar.gz", hash = "sha256:24da5a3aa6f3dc421c74deee1b365d656b9dc54ab8e17a065b73ac4255a5254d", size = 512255, upload-time = "2026-06-28T22:12:56.964Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1d/ac/52de75ee82fba85a809774fcd7a5f25c48f7435afa76f3a7c83c1b185dfd/kafka_python-3.0.7-py3-none-any.whl", hash = "sha256:37dde37c1ed6d4f77ce5164d92eab70fc5d0ed57e9f20a970dc776d0371d4025", size = 613916, upload-time = "2026-06-28T22:12:55.027Z" },
+]
+
+[[package]]
 name = "keyring"
 version = "25.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4407,6 +4416,10 @@ local = [
 metrics = [
     { name = "dbt-metricflow" },
 ]
+stream = [
+    { name = "kafka-python" },
+    { name = "pyspark" },
+]
 vector = [
     { name = "fastembed" },
     { name = "pgvector" },
@@ -4423,6 +4436,7 @@ requires-dist = [
     { name = "fastembed", marker = "extra == 'vector'", specifier = ">=0.3" },
     { name = "feast", marker = "extra == 'feast'", specifier = ">=0.40" },
     { name = "great-expectations", marker = "extra == 'dq'", specifier = ">=1.0" },
+    { name = "kafka-python", marker = "extra == 'stream'", specifier = ">=2.0" },
     { name = "mlflow", marker = "extra == 'local'", specifier = ">=2.16" },
     { name = "numpy", marker = "extra == 'local'", specifier = ">=1.26" },
     { name = "pandas", marker = "extra == 'local'", specifier = ">=2.2" },
@@ -4430,11 +4444,12 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], marker = "extra == 'vector'", specifier = ">=3.1" },
     { name = "pyarrow", marker = "extra == 'local'", specifier = ">=17" },
     { name = "pyspark", marker = "extra == 'databricks'", specifier = ">=3.5" },
+    { name = "pyspark", marker = "extra == 'stream'", specifier = ">=3.5" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "scikit-learn", marker = "extra == 'local'", specifier = ">=1.5" },
 ]
-provides-extras = ["local", "databricks", "databricks-connect", "feast", "vector", "metrics", "dq", "dev"]
+provides-extras = ["local", "databricks", "databricks-connect", "feast", "vector", "metrics", "dq", "stream", "dev"]
 
 [[package]]
 name = "waitress"

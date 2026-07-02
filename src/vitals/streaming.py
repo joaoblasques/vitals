@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from pathlib import Path
 
 # Spark 4 supports Java 17/21 (not 24). Prefer a 17/21 JDK if present.
@@ -28,6 +29,10 @@ BRONZE_WEARABLES = ROOT / "data" / "bronze" / "wearables.ndjson"
 LANDING = ROOT / "data" / "stream" / "landing"
 OUT = ROOT / "data" / "stream" / "cleaned"
 CHECKPOINT = ROOT / "data" / "stream" / "checkpoint"
+OUT_KAFKA = ROOT / "data" / "stream" / "cleaned_kafka"
+CHECKPOINT_KAFKA = ROOT / "data" / "stream" / "checkpoint_kafka"
+BOOTSTRAP = "localhost:9092"
+TOPIC = "wearables"
 
 
 def kafka_connector_package(version: str | None = None) -> str:
@@ -83,6 +88,19 @@ def produce_stream(n_batches: int = 6) -> int:
     return len(lines)
 
 
+def produce_to_kafka(bootstrap: str = BOOTSTRAP, topic: str = TOPIC) -> int:
+    """Publish each wearable bronze event (one NDJSON line = one JSON message) to the Kafka topic."""
+    from kafka import KafkaProducer
+    producer = KafkaProducer(bootstrap_servers=bootstrap, acks="all", linger_ms=5)
+    lines = [ln for ln in BRONZE_WEARABLES.read_text().splitlines() if ln.strip()]
+    for ln in lines:
+        producer.send(topic, ln.encode("utf-8"))
+    producer.flush()
+    producer.close()
+    print(f"produced {len(lines)} events -> kafka topic '{topic}'")
+    return len(lines)
+
+
 def run_stream() -> dict:
     from pyspark.sql import SparkSession
 
@@ -122,10 +140,83 @@ def run_stream() -> dict:
     return result
 
 
-def main() -> dict:
+def run_stream_kafka() -> dict:
+    from pyspark.sql import SparkSession
+    from pyspark.sql import functions as F
+
+    shutil.rmtree(OUT_KAFKA, ignore_errors=True)
+    shutil.rmtree(CHECKPOINT_KAFKA, ignore_errors=True)
+
+    spark = (SparkSession.builder.master("local[2]").appName("vitals-wearable-stream-kafka")
+             .config("spark.ui.enabled", "false")
+             .config("spark.sql.shuffle.partitions", "4")
+             .config("spark.jars.packages", kafka_connector_package())
+             .getOrCreate())
+    spark.sparkContext.setLogLevel("ERROR")
+
+    raw = (spark.readStream.format("kafka")
+           .option("kafka.bootstrap.servers", BOOTSTRAP)
+           .option("subscribe", TOPIC)
+           .option("startingOffsets", "earliest")
+           .load())
+    # Kafka value is bytes -> string -> parse JSON with the SAME schema the file source uses.
+    parsed = (raw.select(F.from_json(F.col("value").cast("string"), _schema()).alias("j"))
+              .select("j.*"))
+    cleaned = clean_wearables(parsed)
+
+    query = (cleaned.writeStream.format("parquet")
+             .option("path", str(OUT_KAFKA))
+             .option("checkpointLocation", str(CHECKPOINT_KAFKA))
+             .outputMode("append")
+             .trigger(availableNow=True)
+             .start())
+    query.awaitTermination()
+
+    out = spark.read.parquet(str(OUT_KAFKA))
+    n = out.count()
+    outliers = out.filter("steps is null").count()
+    spark.stop()
+    result = {"events_streamed": n, "outliers_nulled": outliers,
+              "sink": "data/stream/cleaned_kafka (parquet)"}
+    print("kafka streaming complete:", result)
+    return result
+
+
+def run_parity() -> dict:
+    """Run BOTH sources and assert the cleaned output is identical (only the source changed)."""
+    import pandas as pd
+    produce_stream()
+    file_res = run_stream()
+    produce_to_kafka()
+    kafka_res = run_stream_kafka()
+
+    def _load(path):
+        df = pd.read_parquet(path)
+        return df.sort_values(by=list(df.columns)).reset_index(drop=True)
+
+    f, k = _load(OUT), _load(OUT_KAFKA)
+    identical = f.equals(k)
+    result = {"file": file_res, "kafka": kafka_res,
+              "identical": bool(identical), "n_file": len(f), "n_kafka": len(k)}
+    print("parity:", {"identical": result["identical"], "n_file": len(f), "n_kafka": len(k)})
+    return result
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    cmd = argv[0] if argv else "file"
+    if cmd == "produce":
+        return {"produced": produce_to_kafka()}
+    if cmd == "kafka":
+        produce_to_kafka()
+        return run_stream_kafka()
+    if cmd == "parity":
+        return run_parity()
     produce_stream()
     return run_stream()
 
 
 if __name__ == "__main__":
-    main()
+    result = main()
+    if isinstance(result, dict) and result.get("identical") is False:
+        raise SystemExit(1)   # `make stream-parity` fails the shell on a mismatch
