@@ -70,8 +70,8 @@ The medallion runs **two ways by design**:
   the full pipeline as a **scheduled serverless job**: `medallion_ingest` (Python wheel — generate
   → bronze Delta → silver Delta with PHI + non-empty gates) → `gold_dbt` (dbt marts + tests) →
   `drift_monitor` (PSI feature-drift scored to `vitals_gold.monitoring.drift_report`). Verified
-  `TERMINATED SUCCESS`; bronze = 28,816 rows, silver = 27,402. Failure alerts page on every failed
-  run.
+  `TERMINATED SUCCESS`; bronze = 28,816 rows, silver = 27,402. A failed run emails the deploying
+  user (`email_notifications.on_failure`).
 
 The **wearable stream** reads from a **real local Kafka broker** (Docker, single-node KRaft), not
 just a file source. Parity is proven: `make stream-parity` runs both the file and Kafka paths
