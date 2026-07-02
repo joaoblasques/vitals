@@ -23,6 +23,16 @@ pipeline if any PHI column survives into silver.
 | `patient_key` hashing | UC governed surrogate + access policies |
 | schema separation `bronze`/`silver`/`gold` | UC catalogs/schemas with grants per tier (provisioned by `infra/terraform/`) |
 
+## Data quality gates
+
+**Great Expectations** gates the **silver DQ contract in CI** (`make dq`;
+[ADR 0009](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0009-great-expectations-silver-dq.md)).
+A code-defined GX Core 1.x suite validates the conformed silver tables and exits non-zero on any
+violation — the gate cannot be skipped. Signature checks: coded-vocabulary value-sets (every
+`condition.icd10_code` ∈ ICD-10, `observation.metric` ∈ standard set, glucose `unit_std` ==
+`mg/dL`), the PHI-column allow-list (no identifier survives into silver), and key integrity. This
+complements the dbt tests that gate gold.
+
 ## Lineage & data dictionary
 
 End-to-end lineage and a per-column dictionary are **auto-generated from dbt** — see
@@ -43,8 +53,11 @@ Demonstrated two ways:
 | **Natural split** (reference vs held-out current) | all features **stable** (one moderate) — no false alarms |
 | **Injected population shift** (sicker, less active cohort) | **flags `mean_pain`, `mean_odi`, `mean_active_min` as significant** + `mean_steps` moderate |
 
-In production this runs on a schedule and alerts when a serving feature drifts past threshold,
-triggering retraining review — essential where a stale model affects care.
+This is already scheduled: a `drift_monitor` task runs **downstream of `gold_dbt`** in the
+deployed Databricks Asset Bundle job, scoring PSI on every data move and appending a tidy history
+to `vitals_gold.monitoring.drift_report`
+([ADR 0005 Update](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md))
+— essential where a stale model affects care.
 
 ## Decisions
 

@@ -28,6 +28,9 @@ something different:
 | **Feature store** | Feast (offline + online) | surgery-risk / adherence models |
 | **Vector index** | pgvector | RAG over clinical notes |
 
+The full medallion runs as a **scheduled Databricks serverless job** (bronze → silver → gold →
+drift monitor), with a local **Kafka** wearable stream exercised as a real streaming source.
+
 See [Architecture](architecture.md) for the full medallion design and the healthcare layer
 (FHIR → OMOP, de-identification at the silver boundary, coded-vocabulary data quality).
 
