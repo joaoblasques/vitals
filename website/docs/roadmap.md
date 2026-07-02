@@ -15,7 +15,7 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] **29 dbt tests** on the silver/gold gate, passing; marts backed by a **MetricFlow semantic layer** (7 composable metrics, `make metrics-query`) ([ADR 0007](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0007-dbt-semantic-layer.md))
 - [x] Feast feature store (600×8) — **materialized offline→online (sqlite); point-in-time historical retrieval**, parity-proven vs offline parquet ([ADR 0008](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0008-feast-feature-store.md))
 - [x] Vector index + RAG query over clinical notes — real **pgvector** store (fastembed BGE-small 384-d, HNSW cosine, local Docker) with TF-IDF fallback when the store is absent ([ADR 0006](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0006-pgvector-local-serving-store.md))
-- [x] Demo surgery-risk model (MLflow, ROC-AUC 0.825)
+- [x] Demo surgery-risk model (MLflow, ROC-AUC 0.825 at Phase 1; the widened model scores ~0.75 — see [Results](results.md))
 - [x] Single end-to-end run (`make run`) + Airflow DAG mirroring it
 - See the [Results](results.md).
 

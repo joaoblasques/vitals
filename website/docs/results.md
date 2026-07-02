@@ -116,7 +116,7 @@ and surgery rate per condition.
 | Knee osteoarthritis (bilateral) | 124 | 0.282 | $784 | 54.0% |
 | Rotator cuff tear | 116 | 0.052 | $729 | 62.1% |
 
-dbt now totals **1 seed + 10 models + 26 data tests, all passing**.
+dbt now totals **1 seed + 12 models + 29 data tests, all passing** (incl. the MetricFlow semantic layer).
 
 ## 8. Streaming + Spark at scale (Phase 3)
 
