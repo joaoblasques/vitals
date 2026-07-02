@@ -19,8 +19,9 @@ default and the **parity reference**: `run_parity()` runs both and asserts the c
 Key choices:
 - **One shared transform.** `clean_wearables` is extracted so both sources run identical downstream
   logic — that's what makes the parity meaningful (and DRY).
-- **Connector pinned to pyspark.** `spark-sql-kafka-0-10_<scala>:<version>` is derived from the
-  installed pyspark (Scala 2.13 for Spark 4) — a mismatch fails fast.
+- **Connector pinned to pyspark.** The Maven coordinate (e.g. `spark-sql-kafka-0-10_2.13:4.1.2`) is
+  derived from the installed pyspark — Scala 2.13 for Spark 4, 2.12 for Spark 3.x, version == pyspark's
+  — so a mismatch fails fast.
 - **Out of the hermetic CI gate.** Streaming needs JDK + Spark + Docker; it stays a `make` demo with a
   `stream` optional extra, never in the clone-and-run CI path (only the pure connector-helper is tested).
 
