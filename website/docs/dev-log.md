@@ -25,7 +25,7 @@ A running, dated log of what was built and what was learned — newest first.
 ## 2026-06-26 — Databricks deploy path + ops hardening ✅
 - **Asset Bundle job** (`databricks.yml`) ships gold as a scheduled serverless job (`make bundle-deploy` / `bundle-run`, verified `TERMINATED SUCCESS`). Dev path stays databricks-connect for fast iteration; the bundle path is the "how this ships in a real shop" answer — two modes, one codebase behind a target switch.
 - **Failure alerts** (`on_failure` email, address injected at deploy time — no address committed to this public repo) and **drift monitoring as a job task** (`drift_monitor` `spark_python_task` runs downstream of `gold_dbt`, scores PSI feature-drift on every run, appends to `vitals_gold.monitoring.drift_report`).
-- **Hermetic CI gate** (`.github/workflows/ci.yml`): ruff + unit tests + full local pipeline + GE silver gate, on every push. ([ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md))
+- **Hermetic CI gate** (`.github/workflows/ci.yml`): ruff + unit tests + full local pipeline, on every push. ([ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md))
 
 ## 2026-06-23 — Phase 4: governance & polish ✅
 - **Drift monitoring** (`monitoring.py`): PSI per feature, reference vs current. Stable on a natural
