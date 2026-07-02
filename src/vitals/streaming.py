@@ -30,6 +30,45 @@ OUT = ROOT / "data" / "stream" / "cleaned"
 CHECKPOINT = ROOT / "data" / "stream" / "checkpoint"
 
 
+def kafka_connector_package(version: str | None = None) -> str:
+    """Maven coordinate for the spark-sql-kafka connector, matching the installed pyspark: Scala 2.13
+    for Spark 4+, 2.12 for Spark 3.x; connector version == pyspark version (they must line up)."""
+    if version is None:
+        import pyspark
+        version = pyspark.__version__
+    scala = "2.13" if int(version.split(".")[0]) >= 4 else "2.12"
+    return f"org.apache.spark:spark-sql-kafka-0-10_{scala}:{version}"
+
+
+def _schema():
+    from pyspark.sql.types import StructType, StructField, StringType, LongType, DoubleType
+    return StructType([
+        StructField("type", StringType()),
+        StructField("id", StringType()),
+        StructField("patient", StructType([StructField("reference", StringType())])),
+        StructField("date", StringType()),
+        StructField("steps", LongType()),
+        StructField("active_minutes", LongType()),
+        StructField("resting_hr", LongType()),
+        StructField("sleep_hours", DoubleType()),
+    ])
+
+
+# SCHEMA is the builder function; call SCHEMA() to obtain the StructType (keeps module hermetic).
+SCHEMA = _schema
+
+
+def clean_wearables(stream):
+    """The shared cleaning transform (identical for the file + Kafka sources): derive patient_key +
+    event_date, null out impossible step counts, select the canonical columns."""
+    from pyspark.sql import functions as F
+    return (stream
+            .withColumn("patient_key", F.md5(F.regexp_replace("patient.reference", "Patient/", "")))
+            .withColumn("event_date", F.to_date("date"))
+            .withColumn("steps", F.when((F.col("steps") >= 0) & (F.col("steps") <= 50000), F.col("steps")))
+            .select("patient_key", "event_date", "steps", "active_minutes", "resting_hr", "sleep_hours"))
+
+
 def produce_stream(n_batches: int = 6) -> int:
     """Split the wearable bronze file into N micro-batch JSON files (simulated arrival)."""
     LANDING.mkdir(parents=True, exist_ok=True)
@@ -46,8 +85,6 @@ def produce_stream(n_batches: int = 6) -> int:
 
 def run_stream() -> dict:
     from pyspark.sql import SparkSession
-    from pyspark.sql import functions as F
-    from pyspark.sql.types import (StructType, StructField, StringType, LongType, DoubleType)
 
     shutil.rmtree(OUT, ignore_errors=True)
     shutil.rmtree(CHECKPOINT, ignore_errors=True)
@@ -59,26 +96,12 @@ def run_stream() -> dict:
     spark.sparkContext.setLogLevel("ERROR")
 
     # File-source streaming needs an explicit schema (same schema a Kafka value would deserialize to).
-    schema = StructType([
-        StructField("type", StringType()),
-        StructField("id", StringType()),
-        StructField("patient", StructType([StructField("reference", StringType())])),
-        StructField("date", StringType()),
-        StructField("steps", LongType()),
-        StructField("active_minutes", LongType()),
-        StructField("resting_hr", LongType()),
-        StructField("sleep_hours", DoubleType()),
-    ])
+    schema = _schema()
 
     stream = (spark.readStream.schema(schema).option("maxFilesPerTrigger", 1)
               .json(str(LANDING)))
 
-    cleaned = (stream
-               .withColumn("patient_key", F.md5(F.regexp_replace("patient.reference", "Patient/", "")))
-               .withColumn("event_date", F.to_date("date"))
-               # on-the-fly outlier handling: null-out impossible step counts
-               .withColumn("steps", F.when((F.col("steps") >= 0) & (F.col("steps") <= 50000), F.col("steps")))
-               .select("patient_key", "event_date", "steps", "active_minutes", "resting_hr", "sleep_hours"))
+    cleaned = clean_wearables(stream)
 
     query = (cleaned.writeStream.format("parquet")
              .option("path", str(OUT))
