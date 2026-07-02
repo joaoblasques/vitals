@@ -2,6 +2,31 @@
 
 A running, dated log of what was built and what was learned — newest first.
 
+## 2026-07-02 — Real Kafka stream source ✅
+- Wearable stream now reads `format("kafka")` from a **local Docker KRaft broker** (single-node, no Zookeeper). A `kafka-python` producer publishes 15169 events to the `wearables` topic; the Spark consumer runs the **same** `clean_wearables` transform → same parquet sink as the file path.
+- `make stream-parity` confirms cleaned output is **identical** (15169 events, file == kafka) — concrete proof the source swap changes nothing downstream. Closes the "compatible but not exercised" gap. ([ADR 0010](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0010-kafka-streaming-source.md))
+
+## 2026-07-01 — Great Expectations silver DQ gate ✅
+- **Great Expectations** (GX Core 1.x) is now the **gating** DQ contract for silver. A code-defined suite (`src/vitals/dq.py`) validates coded-vocabulary value-sets (every `icd10_code` ∈ the ICD-10 set, `observation.metric` ∈ the standard set, glucose `unit_std` == `mg/dL`), the PHI boundary column set, and ranges + key uniqueness — exits non-zero on any violation.
+- **CI runs it after `make build`**: the gate can't be skipped. Complements (not replaces) the descriptive `dq_report.json`; dbt tests still gate gold. ([ADR 0009](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0009-great-expectations-silver-dq.md))
+
+## 2026-06-30 — Feast feature store made real ✅
+- Feast was scaffolded but never applied. Now **materialized offline→online (sqlite)**: `get_online_features` (low-latency inference path) + **point-in-time historical retrieval** (`get_historical_features` over an entity dataframe — the leakage-safe training join). Both paths parity-checked against the offline parquet (NULL-aware, float-tolerant). `make feast-demo`.
+- Production would point the offline store at Databricks/Delta — noted, not exercised (local is the deliverable). ([ADR 0008](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0008-feast-feature-store.md))
+
+## 2026-06-30 — Full-medallion job on Databricks ✅
+- Bronze + silver are now **in the Asset Bundle job** as a `python_wheel_task` (`medallion_ingest`). One scheduled serverless run does generate → bronze Delta → silver Delta → gold (dbt + 29 tests) → drift monitor, no laptop. Verified **TERMINATED SUCCESS**: `medallion_ingest` (bronze=28816, silver=27402) → `gold_dbt` → `drift_monitor`. ([ADR 0005 Update](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md))
+- Three Free-Edition lessons learned live: ship a lean wheel (core deps → `local` extra); pin the compute Python version (env version 3 / Python 3.12); branch dbt dialect on `target.type` (`metricflow_time_spine` needed `range()` on DuckDB vs `sequence()+explode()` on Spark).
+
+## 2026-06-29 — dbt semantic layer + real pgvector RAG ✅
+- **MetricFlow semantic layer**: 7 composable metrics (`surgery_rate`, `avg_conservative_spend`, …) declared in YAML over a new `fct_patient_metrics` per-patient base. `mf query` results parity-proven against the marts; `make metrics-query`. ([ADR 0007](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0007-dbt-semantic-layer.md))
+- **pgvector** replaces the TF-IDF placeholder: Docker (`pgvector/pgvector:pg16`), fastembed `bge-small-en-v1.5` (384-d ONNX/CPU, no API keys), **HNSW cosine** index, idempotent upsert. TF-IDF path remains the fallback when the store or `vector` extra is absent. `make rag-up / rag-index / rag-query`. ([ADR 0006](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0006-pgvector-local-serving-store.md))
+
+## 2026-06-26 — Databricks deploy path + ops hardening ✅
+- **Asset Bundle job** (`databricks.yml`) ships gold as a scheduled serverless job (`make bundle-deploy` / `bundle-run`, verified `TERMINATED SUCCESS`). Dev path stays databricks-connect for fast iteration; the bundle path is the "how this ships in a real shop" answer — two modes, one codebase behind a target switch.
+- **Failure alerts** (`on_failure` email, address injected at deploy time — no address committed to this public repo) and **drift monitoring as a job task** (`drift_monitor` `spark_python_task` runs downstream of `gold_dbt`, scores PSI feature-drift on every run, appends to `vitals_gold.monitoring.drift_report`).
+- **Hermetic CI gate** (`.github/workflows/ci.yml`): ruff + unit tests + full local pipeline + GE silver gate, on every push. ([ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md))
+
 ## 2026-06-23 — Phase 4: governance & polish ✅
 - **Drift monitoring** (`monitoring.py`): PSI per feature, reference vs current. Stable on a natural
   split; correctly **flags an injected population shift** (pain/ODI/activity → significant).

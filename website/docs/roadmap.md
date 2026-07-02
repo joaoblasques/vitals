@@ -12,9 +12,9 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] Mess-injector (schema drift, dupes, unit drift, missingness — deterministic seed)
 - [x] bronze→silver: flatten FHIR; de-id (PHI dropped + assertion); standardize LOINC/ICD-10, mmol/L→mg/dL
 - [x] dbt silver→gold: `dim_patient`, `fct_observation`, `mart_condition_outcomes` metric mart
-- [x] dbt tests on the silver/gold gate (8 tests passing)
-- [x] Feast feature table (600×8, offline Parquet + Feast repo)
-- [x] Vector index + RAG query over clinical notes (TF-IDF; pgvector is the prod target)
+- [x] **29 dbt tests** on the silver/gold gate, passing; marts backed by a **MetricFlow semantic layer** (7 composable metrics, `make metrics-query`) ([ADR 0007](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0007-dbt-semantic-layer.md))
+- [x] Feast feature store (600×8) — **materialized offline→online (sqlite); point-in-time historical retrieval**, parity-proven vs offline parquet ([ADR 0008](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0008-feast-feature-store.md))
+- [x] Vector index + RAG query over clinical notes — real **pgvector** store (fastembed BGE-small 384-d, HNSW cosine, local Docker) with TF-IDF fallback when the store is absent ([ADR 0006](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0006-pgvector-local-serving-store.md))
 - [x] Demo surgery-risk model (MLflow, ROC-AUC 0.825)
 - [x] Single end-to-end run (`make run`) + Airflow DAG mirroring it
 - See the [Results](results.md).
@@ -25,7 +25,7 @@ Built **MVP-first**: one source end-to-end before widening. Each phase leaves a 
 - [x] Expand marts & features — `mart_cost_outcomes`; 20-feature store across 4 sources
 
 ## Phase 3 — Streaming + scale ✅
-- [x] Wearable stream via **Spark Structured Streaming** (file-source demo, checkpointed sink; Kafka in prod)
+- [x] Wearable stream via **Spark Structured Streaming** — real **Kafka source** (local Docker KRaft broker, `format("kafka")`), parity-proven identical (15169 events, file == kafka); file-source path remains the no-broker default ([ADR 0010](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0010-kafka-streaming-source.md))
 - [x] **PySpark-at-scale** transform with a window function (7-obs rolling pain per patient)
 
 ## Phase 4 — Governance & polish ✅
@@ -46,3 +46,9 @@ parity** verified against the local DuckDB pipeline.
 - [x] **Silver → Delta** (the PHI boundary on UC): de-id + conform ported to Spark, written as 8 Delta tables in `vitals_silver.clinical.*`. De-id assertion (no identifiers in `silver.patient`) + full DQ parity vs local DuckDB verified (row counts, coding %, unit standardization, text-recovery). Cross-engine verification also surfaced & fixed a latent DuckDB bug (quoted-JSON billed amounts silently dropped).
 - [x] **Gold via dbt-databricks**: the existing dbt models build into `vitals_gold.marts` on the serverless SQL warehouse (target-aware `silver` source resolves to `vitals_silver.clinical`). All 10 models + 26 dbt tests pass on Databricks; all 11 gold tables match local DuckDB row counts.
 - [x] **Production deploy path** (the deployment half of [ADR 0005](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md)): a **Databricks Asset Bundle** (`databricks.yml`) ships the gold stage as a **scheduled serverless job** (dbt marts + the 26 dbt tests as in-job quality gates), deployed + run from code (`make bundle-deploy` / `bundle-run`, verified `TERMINATED SUCCESS`). Promoting bronze/silver into the job (a `python_wheel_task`) is the documented next step.
+
+## Phase 6 — three-store gold made real, governed & streamed ✅
+- [x] **Full-medallion `python_wheel_task` job**: a single scheduled serverless run does generate → bronze → silver → gold → drift, no laptop; verified **TERMINATED SUCCESS** ([ADR 0005 Update](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0005-spark-execution-databricks-connect.md)). Includes failure alerts (`on_failure` email, address injected at deploy time) and drift monitoring as a downstream job task writing to `vitals_gold.monitoring.drift_report`.
+- [x] **MetricFlow semantic layer** over the marts: 7 composable metrics declared in YAML, parity-proven vs the dbt marts, queryable via `make metrics-query` ([ADR 0007](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0007-dbt-semantic-layer.md)).
+- [x] **Great Expectations** gates the silver DQ contract in CI: coded-vocabulary value-sets (every `icd10_code` ∈ ICD-10, `observation.metric` ∈ standard set, glucose `unit_std` == `mg/dL`), PHI boundary column check, ranges + key uniqueness (`make dq`) ([ADR 0009](https://github.com/joaoblasques/vitals/blob/main/docs/adr/0009-great-expectations-silver-dq.md)).
+- [x] **Hermetic CI quality gate** (`.github/workflows/ci.yml`): ruff + unit tests + full local pipeline + the GE silver gate, on every push — DQ can't be skipped.
