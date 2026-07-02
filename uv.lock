@@ -4418,6 +4418,8 @@ metrics = [
 ]
 stream = [
     { name = "kafka-python" },
+    { name = "pandas" },
+    { name = "pyarrow" },
     { name = "pyspark" },
 ]
 vector = [
@@ -4440,9 +4442,11 @@ requires-dist = [
     { name = "mlflow", marker = "extra == 'local'", specifier = ">=2.16" },
     { name = "numpy", marker = "extra == 'local'", specifier = ">=1.26" },
     { name = "pandas", marker = "extra == 'local'", specifier = ">=2.2" },
+    { name = "pandas", marker = "extra == 'stream'", specifier = ">=2.2" },
     { name = "pgvector", marker = "extra == 'vector'", specifier = ">=0.3" },
     { name = "psycopg", extras = ["binary"], marker = "extra == 'vector'", specifier = ">=3.1" },
     { name = "pyarrow", marker = "extra == 'local'", specifier = ">=17" },
+    { name = "pyarrow", marker = "extra == 'stream'", specifier = ">=17" },
     { name = "pyspark", marker = "extra == 'databricks'", specifier = ">=3.5" },
     { name = "pyspark", marker = "extra == 'stream'", specifier = ">=3.5" },
     { name = "pytest", marker = "extra == 'dev'" },

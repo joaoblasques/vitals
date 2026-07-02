@@ -89,8 +89,27 @@ def produce_stream(n_batches: int = 6) -> int:
 
 
 def produce_to_kafka(bootstrap: str = BOOTSTRAP, topic: str = TOPIC) -> int:
-    """Publish each wearable bronze event (one NDJSON line = one JSON message) to the Kafka topic."""
+    """Publish each wearable bronze event (one NDJSON line = one JSON message) to the Kafka topic.
+
+    Resets the topic first (delete + wait), so each run holds exactly this run's events — a Kafka topic
+    is a persistent log, and `startingOffsets=earliest` would otherwise re-read every prior run's events
+    and break the parity. Topic is auto-created fresh on the first publish."""
+    import time
+
     from kafka import KafkaProducer
+    from kafka.admin import KafkaAdminClient
+
+    admin = KafkaAdminClient(bootstrap_servers=bootstrap)
+    try:
+        if topic in admin.list_topics():
+            admin.delete_topics([topic])
+            for _ in range(60):
+                if topic not in admin.list_topics():
+                    break
+                time.sleep(0.5)
+    finally:
+        admin.close()
+
     producer = KafkaProducer(bootstrap_servers=bootstrap, acks="all", linger_ms=5)
     lines = [ln for ln in BRONZE_WEARABLES.read_text().splitlines() if ln.strip()]
     for ln in lines:
@@ -183,12 +202,18 @@ def run_stream_kafka() -> dict:
 
 
 def run_parity() -> dict:
-    """Run BOTH sources and assert the cleaned output is identical (only the source changed)."""
+    """Run BOTH sources and assert the cleaned output is identical (only the source changed).
+
+    Each path runs in its OWN subprocess (fresh JVM): `spark.jars.packages` (the Kafka connector) is
+    only honored when the JVM first starts, so two Spark sessions in one process would leave the Kafka
+    read without its connector. Separate processes = each job gets the jars it declares.
+    """
+    import subprocess
+
     import pandas as pd
-    produce_stream()
-    file_res = run_stream()
-    produce_to_kafka()
-    kafka_res = run_stream_kafka()
+
+    for cmd in ("file", "kafka"):
+        subprocess.run([sys.executable, "-m", "vitals.streaming", cmd], check=True, env=os.environ)
 
     def _load(path):
         df = pd.read_parquet(path)
@@ -196,9 +221,8 @@ def run_parity() -> dict:
 
     f, k = _load(OUT), _load(OUT_KAFKA)
     identical = f.equals(k)
-    result = {"file": file_res, "kafka": kafka_res,
-              "identical": bool(identical), "n_file": len(f), "n_kafka": len(k)}
-    print("parity:", {"identical": result["identical"], "n_file": len(f), "n_kafka": len(k)})
+    result = {"identical": bool(identical), "n_file": len(f), "n_kafka": len(k)}
+    print("parity:", result)
     return result
 
 

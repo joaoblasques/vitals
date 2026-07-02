@@ -36,7 +36,8 @@ metrics = ["dbt-metricflow"]
 # CI), not an optional demo — but kept out of core so clone-and-run/`make run` stays lean.
 dq = ["great-expectations>=1.0"]
 # Streaming — real Kafka source for the wearable feed (ADR 0010). Local Docker broker; not in CI.
-stream = ["kafka-python>=2.0", "pyspark>=3.5"]
+# pandas + pyarrow are used by run_parity to read/compare the two cleaned parquet outputs (core is lean).
+stream = ["kafka-python>=2.0", "pyspark>=3.5", "pandas>=2.2", "pyarrow>=17"]
 dev = ["ruff", "pytest"]
 
 [build-system]

@@ -31,8 +31,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    # Fast TCP readiness on the broker port — the JVM kafka-broker-api-versions.sh CLI takes longer
+    # to start than any sane healthcheck timeout (it never reports healthy in time). Port-open on 9092
+    # is a sufficient readiness signal for a local single-node broker.
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092' || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 20
