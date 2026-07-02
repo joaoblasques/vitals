@@ -1,14 +1,10 @@
 """Phase 3 — Spark Structured Streaming for the wearable feed.
 
-Wearables arrive continuously in production; batch isn't enough. This job consumes them as a
-stream, cleans outliers on the fly, and writes a cleaned Parquet stream with checkpointing.
-
-The source here is a *file* stream (a landing directory of micro-batch JSON files) so the demo
-runs with no broker. **In production the only change is the source**:
-    .readStream.format("kafka").option("subscribe", "wearables") ...
-instead of `.readStream.schema(...).json(landing)`. Everything downstream is identical.
-
-Run: `python -m vitals.streaming`  (needs the `[databricks]` extra: pyspark).
+Two interchangeable sources feed ONE cleaning transform (`clean_wearables`):
+  - file source  (`run_stream`)      — micro-batch JSON files; no broker, the clone-and-run default.
+  - Kafka source (`run_stream_kafka`) — a real broker (`make stream-up`), `readStream.format("kafka")`.
+`run_parity` runs both and asserts the cleaned output is identical — proving only the source changed
+(ADR 0010). Kafka path needs the `stream` extra (kafka-python + pyspark) + JDK 17/21 + Docker.
 """
 from __future__ import annotations
 

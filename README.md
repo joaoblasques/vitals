@@ -54,7 +54,7 @@ apart from a generic ETL project.
 ## Tech stack
 
 Databricks (Delta + Unity Catalog) · Python + SQL · **dbt** · **Airflow** · **PySpark** + Spark
-Structured Streaming · **Kafka** · **Feast** · **pgvector** · **MLflow** ·
+Structured Streaming · **Kafka** (real broker — the wearable stream reads `format("kafka")`; `make stream-up` + `make stream-parity`) · **Feast** · **pgvector** · **MLflow** ·
 **Great Expectations** (gates the silver coded-vocabulary DQ contract in CI — `make dq`) ·
 **Terraform**. Tooling pinned with **mise**; Python deps via **uv**.
 
