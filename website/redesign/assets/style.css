@@ -231,9 +231,10 @@ table.tbl tbody tr:hover{background:#FAFBFA}
 
 /* roadmap phases */
 .phase{background:#fff;border:1px solid var(--hair);border-radius:14px;padding:26px 28px;margin-bottom:18px}
-.phase-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
-.phase-head .ph{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)}
+.phase-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px;margin-bottom:14px}
+.phase-head .ph{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2);flex-shrink:0}
 .phase-head h3{font-family:var(--serif);font-weight:500;font-size:22px}
+.phase-head .pill{margin-left:auto;align-self:center}
 .pill{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:100px;background:var(--teal-tint);color:var(--teal);border:1px solid var(--teal-line)}
 .checklist{list-style:none;padding:0;margin:0}
 .checklist li{position:relative;padding-left:28px;margin-bottom:12px;font-size:15.5px;line-height:1.6;color:var(--muted)}
