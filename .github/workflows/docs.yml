@@ -30,6 +30,11 @@ jobs:
         run: pip install -r website/requirements.txt
       - name: Build
         run: cd website && mkdocs build --strict
+      # Serve the standalone static redesign at /vitals/preview/ — runs after mkdocs builds
+      # website/site and before the artifact upload, so the preview rides along. MkDocs (/vitals/)
+      # is untouched. Remove this step to drop the preview.
+      - name: Add redesign preview
+        run: cp -r website/redesign website/site/preview
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
