@@ -121,7 +121,7 @@ h1,h2,h3{margin:0}
 
 /* footer */
 .footer{background:var(--teal-deep);color:#EAF2F0}
-.footer-top{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:40px;padding-bottom:56px;border-bottom:1px solid #2A4744}
+.footer-top{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:40px;padding:72px 0 56px;border-bottom:1px solid #2A4744}
 .footer-top h2{font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.12;letter-spacing:-.02em;margin:0 0 14px;max-width:16ch}
 .footer-top .mono{font-family:var(--mono);font-size:16px;color:#A9C4BF;margin:0}
 .footer-bottom{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:20px;padding:32px 0 44px}
@@ -234,7 +234,7 @@ table.tbl tbody tr:hover{background:#FAFBFA}
 .phase-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
 .phase-head .ph{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted2)}
 .phase-head h3{font-family:var(--serif);font-weight:500;font-size:22px}
-.pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:100px;background:var(--teal-tint);color:var(--teal);border:1px solid var(--teal-line)}
+.pill{display:inline-flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap;font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:100px;background:var(--teal-tint);color:var(--teal);border:1px solid var(--teal-line)}
 .checklist{list-style:none;padding:0;margin:0}
 .checklist li{position:relative;padding-left:28px;margin-bottom:12px;font-size:15.5px;line-height:1.6;color:var(--muted)}
 .checklist li:before{content:"✓";position:absolute;left:0;top:0;width:19px;height:19px;background:var(--teal-tint);color:var(--teal);border-radius:5px;font-size:12px;display:flex;align-items:center;justify-content:center;font-weight:700}
