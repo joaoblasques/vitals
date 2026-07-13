@@ -30,11 +30,13 @@ jobs:
         run: pip install -r website/requirements.txt
       - name: Build
         run: cd website && mkdocs build --strict
-      # Serve the standalone static redesign at /vitals/preview/ — runs after mkdocs builds
-      # website/site and before the artifact upload, so the preview rides along. MkDocs (/vitals/)
-      # is untouched. Remove this step to drop the preview.
-      - name: Add redesign preview
-        run: cp -r website/redesign website/site/preview
+      # Front door = the standalone static redesign. Runs after mkdocs builds website/site, then
+      # overlays the redesign at the root so its index.html serves at /vitals/ and its flat pages
+      # (architecture.html, roadmap.html, …) sit where its relative nav links resolve. The old MkDocs
+      # pages stay reachable at their own paths (/vitals/architecture/) as orphans. Revert: switch this
+      # back to `cp -r website/redesign website/site/preview` (preview at /vitals/preview/).
+      - name: Ship redesign as the site
+        run: cp -r website/redesign/. website/site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
