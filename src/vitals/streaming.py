@@ -13,6 +13,8 @@ import shutil
 import sys
 from pathlib import Path
 
+from vitals import salt
+
 # Spark 4 supports Java 17/21 (not 24). Prefer a 17/21 JDK if present.
 for _jh in ("/usr/local/opt/openjdk@17", "/usr/local/opt/openjdk@21"):
     if os.path.isdir(_jh):
@@ -63,8 +65,13 @@ def clean_wearables(stream):
     """The shared cleaning transform (identical for the file + Kafka sources): derive patient_key +
     event_date, null out impossible step counts, select the canonical columns."""
     from pyspark.sql import functions as F
+    # De-id key derivation (ADR 0002): SALTED md5, same shared secret as every other engine, so the
+    # streamed patient_key aligns with the batch silver keys. Both parity subprocesses read one salt.
+    salt_lit = salt.patient_salt()
     return (stream
-            .withColumn("patient_key", F.md5(F.regexp_replace("patient.reference", "Patient/", "")))
+            .withColumn("patient_key",
+                        F.md5(F.concat(F.regexp_replace("patient.reference", "Patient/", ""),
+                                       F.lit(salt_lit))))
             .withColumn("event_date", F.to_date("date"))
             .withColumn("steps", F.when((F.col("steps") >= 0) & (F.col("steps") <= 50000), F.col("steps")))
             .select("patient_key", "event_date", "steps", "active_minutes", "resting_hr", "sleep_hours"))

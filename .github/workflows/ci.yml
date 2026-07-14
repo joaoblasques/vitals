@@ -34,6 +34,10 @@ permissions:
 jobs:
   gate:
     runs-on: ubuntu-latest
+    # CI tests the de-id logic, not the secrecy of the salt (ADR 0002), so a throwaway non-secret salt
+    # lets the hermetic pipeline (pytest + make build + make dq) run. The REAL salt is never in CI.
+    env:
+      VITALS_SALT: ci-not-a-secret-salt
     steps:
       - uses: actions/checkout@v4
       - name: Set up uv (with lockfile cache)

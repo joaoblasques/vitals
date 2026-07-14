@@ -1,8 +1,11 @@
 .PHONY: setup run build dbt clean test dbcxn-setup bronze-databricks silver-databricks gold-baseline gold-databricks drift-databricks bundle-deploy bundle-run rag-up rag-down rag-load rag-query feast-demo metrics-validate metrics-list metrics-query dq stream-up stream-down stream-produce stream-kafka stream-parity
 
-setup:          ## create venv + install the runnable MVP stack
+setup:          ## create venv + install the runnable MVP stack (+ generate the de-id salt)
 	uv venv --python 3.12
 	uv pip install duckdb dbt-duckdb pandas pyarrow numpy scikit-learn mlflow
+	@grep -q '^VITALS_SALT=' .env 2>/dev/null || { \
+	  echo "VITALS_SALT=$$(python3 -c 'import secrets; print(secrets.token_hex(16))')" >> .env; \
+	  echo "Generated a de-identification salt into .env (gitignored; ADR 0002)."; }
 
 run:            ## run the full MVP slice end-to-end
 	PYTHONPATH=src ./.venv/bin/python -m vitals.run

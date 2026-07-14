@@ -13,6 +13,7 @@ from pathlib import Path
 
 import duckdb
 
+from vitals import salt
 from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,6 +27,14 @@ def build() -> dict:
     DB.unlink(missing_ok=True)
     con = duckdb.connect(str(DB))
     con.execute("CREATE SCHEMA IF NOT EXISTS bronze; CREATE SCHEMA IF NOT EXISTS silver;")
+
+    # De-identification key derivation (ADR 0002). The salt is a single shared secret injected
+    # from the environment (never in this public repo). pk() is the salted patient_key hash; ds()
+    # is the salted per-patient date shift. Both are deterministic in the salt, so a patient maps
+    # to the SAME key/shift across every table -> cross-table joins on patient_key hold.
+    salt_lit = salt.sql_literal()
+    con.execute(f"CREATE OR REPLACE MACRO pk(x) AS md5(x || {salt_lit})")
+    con.execute(f"CREATE OR REPLACE MACRO ds(x) AS CAST(abs(hash(x || {salt_lit})) % 21 AS INTEGER) - 10")
 
     # ---- BRONZE: load raw NDJSON (union_by_name absorbs schema drift) ----
     for name in ["patients", "encounters", "conditions", "observations", "notes",
@@ -46,18 +55,18 @@ def build() -> dict:
            WITH dedup AS (
                SELECT *, row_number() OVER (PARTITION BY id ORDER BY id) AS rn FROM bronze.patients
            )
-           SELECT md5(id) AS patient_key,
+           SELECT pk(id) AS patient_key,
                   gender,
                   CASE WHEN birthDate IS NULL THEN NULL
                        ELSE least(90, 2026 - CAST(strftime(CAST(birthDate AS DATE), '%Y') AS INTEGER)) END AS age,
-                  CAST(abs(hash(id)) % 21 AS INTEGER) - 10 AS _date_shift_days   -- per-patient shift (de-id, preserves intervals)
+                  ds(id) AS _date_shift_days   -- salted per-patient shift (de-id, preserves intervals)
            FROM dedup WHERE rn = 1"""
     )
 
     # ---- SILVER: target label (separated from the patient record) ----
     con.execute(
         """CREATE OR REPLACE TABLE silver.target AS
-           SELECT DISTINCT md5(id) AS patient_key, CAST("_label_surgery_90d" AS INTEGER) AS surgery_90d
+           SELECT DISTINCT pk(id) AS patient_key, CAST("_label_surgery_90d" AS INTEGER) AS surgery_90d
            FROM bronze.patients WHERE "_label_surgery_90d" IS NOT NULL"""
     )
 
@@ -65,7 +74,7 @@ def build() -> dict:
     con.execute(
         f"""CREATE OR REPLACE TABLE silver.observation AS
            WITH flat AS (
-               SELECT md5(replace(subject.reference, 'Patient/', '')) AS patient_key,
+               SELECT pk(replace(subject.reference, 'Patient/', '')) AS patient_key,
                       CAST(effectiveDateTime AS DATE) AS obs_date_raw,
                       code.coding[1].code  AS loinc_code,
                       code.coding[1].display AS display,
@@ -95,7 +104,7 @@ def build() -> dict:
     con.execute(
         f"""CREATE OR REPLACE TABLE silver.condition AS
            WITH base AS (
-               SELECT md5(replace(subject.reference,'Patient/','')) AS patient_key,
+               SELECT pk(replace(subject.reference,'Patient/','')) AS patient_key,
                       COALESCE(code.coding[1].code, CASE {cases} ELSE NULL END) AS icd10_code,
                       (code.coding IS NULL AND code.text IS NOT NULL) AS recovered_from_text
                FROM bronze.conditions
@@ -109,7 +118,7 @@ def build() -> dict:
     # ---- SILVER: note (de-identified free text for the vector layer) ----
     con.execute(
         """CREATE OR REPLACE TABLE silver.note AS
-           SELECT md5(replace(subject.reference,'Patient/','')) AS patient_key,
+           SELECT pk(replace(subject.reference,'Patient/','')) AS patient_key,
                   CAST(date AS DATE) AS note_date, text
            FROM bronze.notes WHERE text IS NOT NULL"""
     )
@@ -117,7 +126,7 @@ def build() -> dict:
     # ---- SILVER: claim (cast string-billed → double, flag denials, date-shift) ----
     con.execute(
         """CREATE OR REPLACE TABLE silver.claim AS
-           SELECT md5(replace(c.patient.reference,'Patient/','')) AS patient_key,
+           SELECT pk(replace(c.patient.reference,'Patient/','')) AS patient_key,
                   (CAST(c.billablePeriod.start AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS claim_date,
                   c.procedure[1].code    AS procedure_code,
                   c.procedure[1].display AS procedure_display,
@@ -130,29 +139,29 @@ def build() -> dict:
                   c.status               AS status,
                   (c.status = 'denied')  AS denied
            FROM bronze.claims c
-           JOIN silver.patient p ON p.patient_key = md5(replace(c.patient.reference,'Patient/',''))"""
+           JOIN silver.patient p ON p.patient_key = pk(replace(c.patient.reference,'Patient/',''))"""
     )
 
     # ---- SILVER: PRO surveys (clamp out-of-range ODI to NULL) ----
     con.execute(
         """CREATE OR REPLACE TABLE silver.pro AS
-           SELECT md5(replace(j.subject.reference,'Patient/','')) AS patient_key,
+           SELECT pk(replace(j.subject.reference,'Patient/','')) AS patient_key,
                   (CAST(j.authored AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS survey_date,
                   j.instrument,
                   CASE WHEN j.score BETWEEN 0 AND 100 THEN j.score ELSE NULL END AS score
            FROM bronze.pro_surveys j
-           JOIN silver.patient p ON p.patient_key = md5(replace(j.subject.reference,'Patient/',''))"""
+           JOIN silver.patient p ON p.patient_key = pk(replace(j.subject.reference,'Patient/',''))"""
     )
 
     # ---- SILVER: wearable daily (null-out outlier step counts) ----
     con.execute(
         """CREATE OR REPLACE TABLE silver.wearable_daily AS
-           SELECT md5(replace(w.patient.reference,'Patient/','')) AS patient_key,
+           SELECT pk(replace(w.patient.reference,'Patient/','')) AS patient_key,
                   (CAST(w.date AS DATE) + (p._date_shift_days * INTERVAL 1 DAY))::DATE AS day,
                   CASE WHEN w.steps BETWEEN 0 AND 50000 THEN w.steps ELSE NULL END AS steps,
                   w.active_minutes, w.resting_hr, w.sleep_hours
            FROM bronze.wearables w
-           JOIN silver.patient p ON p.patient_key = md5(replace(w.patient.reference,'Patient/',''))"""
+           JOIN silver.patient p ON p.patient_key = pk(replace(w.patient.reference,'Patient/',''))"""
     )
 
     dq_after = _dq_silver(con)

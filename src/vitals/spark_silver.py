@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from vitals import salt
+
 # Spark 4 supports Java 17/21 (not 24). Prefer a 17/21 JDK if present.
 for _jh in ("/usr/local/opt/openjdk@17", "/usr/local/opt/openjdk@21"):
     if os.path.isdir(_jh):
@@ -35,8 +37,13 @@ def run() -> dict:
 
     raw = spark.read.json(str(OBS))  # schema inferred from the FHIR-shaped NDJSON
 
+    # De-id key derivation (ADR 0002): patient_key is a SALTED md5, same shared secret as every other
+    # engine, so keys align across the DuckDB, Databricks, and streaming paths. Salt read at runtime.
+    salt_lit = salt.patient_salt()
     flat = (raw
-            .withColumn("patient_key", F.md5(F.regexp_replace("subject.reference", "Patient/", "")))
+            .withColumn("patient_key",
+                        F.md5(F.concat(F.regexp_replace("subject.reference", "Patient/", ""),
+                                       F.lit(salt_lit))))
             .withColumn("obs_date", F.to_date("effectiveDateTime"))
             .withColumn("loinc", F.col("code.coding").getItem(0).getField("code"))
             # schema drift: value lives in valueQuantity.value OR a flat value column

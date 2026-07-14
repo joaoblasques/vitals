@@ -18,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 
-from vitals import env
+from vitals import env, salt
 from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -138,6 +138,17 @@ def _silver_statements() -> list[tuple[str, str]]:
     s = f"{SILVER_CATALOG}.{SILVER_SCHEMA}"        # vitals_silver.clinical
     cases = " ".join(f"WHEN lower(code.text)='{t}' THEN '{c}'" for t, c in TEXT_TO_ICD.items())
     disp = " ".join(f"WHEN '{c}' THEN '{d}'" for c, d in ICD_DISPLAY.items())
+    # De-id key derivation (ADR 0002): patient_key is a SALTED md5. The salt is a single shared
+    # secret injected from the environment (Databricks job secret / VITALS_SALT) — never in this
+    # public repo. It's deterministic in the salt, so the same patient maps to the same key across
+    # every table and the joins below hold. `pid` keys a bare id; `pref` keys a FHIR reference.
+    salt_lit = salt.sql_literal()
+    pid = f"md5(id || {salt_lit})"
+    shift = f"CAST(conv(substr(md5(id || {salt_lit}),1,8),16,10) % 21 AS INT) - 10"
+
+    def pref(col: str) -> str:
+        return f"md5(replace({col},'Patient/','') || {salt_lit})"
+
     return [
         # PHI boundary: drop name/identifier/address/birthDate; keep hashed key, gender, capped age,
         # and a deterministic per-patient date shift (preserves intervals, de-identifies dates).
@@ -145,18 +156,18 @@ def _silver_statements() -> list[tuple[str, str]]:
             WITH dedup AS (
                 SELECT *, row_number() OVER (PARTITION BY id ORDER BY id) AS rn FROM {b}.patients
             )
-            SELECT md5(id) AS patient_key,
+            SELECT {pid} AS patient_key,
                    gender,
                    CASE WHEN birthDate IS NULL THEN NULL
                         ELSE least(90, 2026 - year(to_date(birthDate))) END AS age,
-                   CAST(conv(substr(md5(id),1,8),16,10) % 21 AS INT) - 10 AS _date_shift_days
+                   {shift} AS _date_shift_days
             FROM dedup WHERE rn = 1"""),
         ("target", f"""CREATE OR REPLACE TABLE {s}.target AS
-            SELECT DISTINCT md5(id) AS patient_key, CAST(`_label_surgery_90d` AS INT) AS surgery_90d
+            SELECT DISTINCT {pid} AS patient_key, CAST(`_label_surgery_90d` AS INT) AS surgery_90d
             FROM {b}.patients WHERE `_label_surgery_90d` IS NOT NULL"""),
         ("observation", f"""CREATE OR REPLACE TABLE {s}.observation AS
             WITH flat AS (
-                SELECT md5(replace(subject.reference,'Patient/','')) AS patient_key,
+                SELECT {pref('subject.reference')} AS patient_key,
                        to_date(effectiveDateTime) AS obs_date_raw,
                        code.coding[0].code AS loinc_code,
                        code.coding[0].display AS display,
@@ -177,7 +188,7 @@ def _silver_statements() -> list[tuple[str, str]]:
             WHERE f.raw_value IS NOT NULL"""),
         ("condition", f"""CREATE OR REPLACE TABLE {s}.condition AS
             WITH base AS (
-                SELECT md5(replace(subject.reference,'Patient/','')) AS patient_key,
+                SELECT {pref('subject.reference')} AS patient_key,
                        coalesce(code.coding[0].code, CASE {cases} ELSE NULL END) AS icd10_code,
                        (code.coding IS NULL AND code.text IS NOT NULL) AS recovered_from_text
                 FROM {b}.conditions
@@ -187,11 +198,11 @@ def _silver_statements() -> list[tuple[str, str]]:
                    recovered_from_text
             FROM base"""),
         ("note", f"""CREATE OR REPLACE TABLE {s}.note AS
-            SELECT md5(replace(subject.reference,'Patient/','')) AS patient_key,
+            SELECT {pref('subject.reference')} AS patient_key,
                    to_date(`date`) AS note_date, text
             FROM {b}.notes WHERE text IS NOT NULL"""),
         ("claim", f"""CREATE OR REPLACE TABLE {s}.claim AS
-            SELECT md5(replace(c.patient.reference,'Patient/','')) AS patient_key,
+            SELECT {pref('c.patient.reference')} AS patient_key,
                    date_add(to_date(c.billablePeriod.start), p._date_shift_days) AS claim_date,
                    c.`procedure`[0].code AS procedure_code,
                    c.`procedure`[0].display AS procedure_display,
@@ -199,21 +210,21 @@ def _silver_statements() -> list[tuple[str, str]]:
                    try_cast(cast(c.total.value AS string) AS double) AS billed,
                    c.paid AS paid, c.status AS status, (c.status = 'denied') AS denied
             FROM {b}.claims c
-            JOIN {s}.patient p ON p.patient_key = md5(replace(c.patient.reference,'Patient/',''))"""),
+            JOIN {s}.patient p ON p.patient_key = {pref('c.patient.reference')}"""),
         ("pro", f"""CREATE OR REPLACE TABLE {s}.pro AS
-            SELECT md5(replace(j.subject.reference,'Patient/','')) AS patient_key,
+            SELECT {pref('j.subject.reference')} AS patient_key,
                    date_add(to_date(j.authored), p._date_shift_days) AS survey_date,
                    j.instrument,
                    CASE WHEN j.score BETWEEN 0 AND 100 THEN j.score ELSE NULL END AS score
             FROM {b}.pro_surveys j
-            JOIN {s}.patient p ON p.patient_key = md5(replace(j.subject.reference,'Patient/',''))"""),
+            JOIN {s}.patient p ON p.patient_key = {pref('j.subject.reference')}"""),
         ("wearable_daily", f"""CREATE OR REPLACE TABLE {s}.wearable_daily AS
-            SELECT md5(replace(w.patient.reference,'Patient/','')) AS patient_key,
+            SELECT {pref('w.patient.reference')} AS patient_key,
                    date_add(to_date(w.`date`), p._date_shift_days) AS day,
                    CASE WHEN w.steps BETWEEN 0 AND 50000 THEN w.steps ELSE NULL END AS steps,
                    w.active_minutes, w.resting_hr, w.sleep_hours
             FROM {b}.wearables w
-            JOIN {s}.patient p ON p.patient_key = md5(replace(w.patient.reference,'Patient/',''))"""),
+            JOIN {s}.patient p ON p.patient_key = {pref('w.patient.reference')}"""),
     ]
 
 

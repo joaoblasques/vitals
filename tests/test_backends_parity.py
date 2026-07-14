@@ -61,7 +61,9 @@ def test_silver_statements_build_all_tables_patient_first():
 
 def test_silver_patient_drops_phi_and_keeps_surrogate_key():
     sql = dict(dd._silver_statements())["patient"]
-    assert "md5(id) AS patient_key" in sql            # hashed surrogate key
+    # Salted hashed surrogate key (ADR 0002): md5 of id || salt, never a bare md5(id).
+    assert "md5(id ||" in sql and "AS patient_key" in sql
+    assert "md5(id) AS patient_key" not in sql        # the un-salted form must be gone
     assert "_date_shift_days" in sql                  # interval-preserving date shift
     for phi in ("name", "address", "identifier", "birthDate"):
         assert f" {phi}" not in sql.replace("birthDate IS NULL", "")  # not selected (birthDate only in age calc)
