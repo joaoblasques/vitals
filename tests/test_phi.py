@@ -72,3 +72,24 @@ def test_assert_no_phi_error_names_the_table_and_column():
     msg = str(exc_info.value)
     assert "note" in msg
     assert "email" in msg
+
+
+# The real current column sets for every silver table (src/vitals/lakehouse.py /
+# src/vitals/backends/databricks_delta.py _silver_statements()). Hard-coded here (not imported)
+# so this test stays hermetic — no DuckDB build or Spark session required.
+REAL_SILVER_COLUMNS = {
+    "patient": {"patient_key", "gender", "age", "_date_shift_days"},
+    "target": {"patient_key", "surgery_90d"},
+    "observation": {"patient_key", "obs_date", "loinc_code", "display", "value_std", "unit_std", "metric"},
+    "condition": {"patient_key", "icd10_code", "display", "recovered_from_text"},
+    "note": {"patient_key", "note_date", "text"},
+    "claim": {"patient_key", "claim_date", "procedure_code", "procedure_display", "dx_code", "billed", "paid", "status", "denied"},
+    "pro": {"patient_key", "survey_date", "instrument", "score"},
+    "wearable_daily": {"patient_key", "day", "steps", "active_minutes", "resting_hr", "sleep_hours"},
+}
+
+
+@pytest.mark.parametrize("table,columns", sorted(REAL_SILVER_COLUMNS.items()))
+def test_assert_no_phi_passes_every_real_silver_table(table, columns):
+    """Regression guard: broadening to 18 categories must not false-positive on real schemas."""
+    phi.assert_no_phi(table, columns)
