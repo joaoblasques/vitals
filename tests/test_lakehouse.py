@@ -1,5 +1,3 @@
-import duckdb
-
 from vitals import lakehouse, phi
 
 
