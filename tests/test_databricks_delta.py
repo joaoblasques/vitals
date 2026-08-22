@@ -1,0 +1,69 @@
+import pytest
+
+from vitals.backends import databricks_delta as dx
+
+
+class _FakeTable:
+    def __init__(self, columns):
+        self.columns = columns
+
+
+class _FakeSpark:
+    """Minimal stand-in for a SparkSession — only implements .table(name).columns."""
+
+    def __init__(self, tables: dict[str, list[str]]):
+        self._tables = tables
+
+    def table(self, full_name: str):
+        table_name = full_name.rsplit(".", 1)[-1]
+        return _FakeTable(self._tables[table_name])
+
+
+REAL_SILVER_COLUMNS = {
+    "patient": ["patient_key", "gender", "age", "_date_shift_days"],
+    "target": ["patient_key", "surgery_90d"],
+    "observation": ["patient_key", "obs_date", "loinc_code", "display", "value_std", "unit_std", "metric"],
+    "condition": ["patient_key", "icd10_code", "display", "recovered_from_text"],
+    "note": ["patient_key", "note_date", "text"],
+    "claim": ["patient_key", "claim_date", "procedure_code", "procedure_display", "dx_code", "billed", "paid", "status", "denied"],
+    "pro": ["patient_key", "survey_date", "instrument", "score"],
+    "wearable_daily": ["patient_key", "day", "steps", "active_minutes", "resting_hr", "sleep_hours"],
+}
+
+
+def test_assert_all_silver_no_phi_passes_real_schemas():
+    fake_spark = _FakeSpark(REAL_SILVER_COLUMNS)
+    dx.assert_all_silver_no_phi(fake_spark)  # must not raise
+
+
+def test_assert_all_silver_no_phi_checks_every_table():
+    checked = []
+    tables = dict(REAL_SILVER_COLUMNS)
+    fake_spark = _FakeSpark(tables)
+
+    class _SpyTable(_FakeTable):
+        pass
+
+    orig_table = fake_spark.table
+
+    def spy_table(full_name):
+        checked.append(full_name.rsplit(".", 1)[-1])
+        return orig_table(full_name)
+
+    fake_spark.table = spy_table
+    dx.assert_all_silver_no_phi(fake_spark)
+    assert set(checked) == set(dx.SILVER_TABLES)
+
+
+def test_assert_all_silver_no_phi_catches_a_leak_without_a_cluster():
+    """The Databricks-path check must have teeth, provable with zero live infra (CI's proof point)."""
+    poisoned = dict(REAL_SILVER_COLUMNS)
+    poisoned["note"] = poisoned["note"] + ["email"]
+    fake_spark = _FakeSpark(poisoned)
+    with pytest.raises(AssertionError, match="email_addresses"):
+        dx.assert_all_silver_no_phi(fake_spark)
+
+
+def test_silver_table_columns_reads_any_table():
+    fake_spark = _FakeSpark(REAL_SILVER_COLUMNS)
+    assert dx.silver_table_columns(fake_spark, "condition") == REAL_SILVER_COLUMNS["condition"]
