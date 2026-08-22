@@ -34,6 +34,15 @@ def test_every_category_has_at_least_one_pattern():
         assert patterns, f"category {category!r} has no patterns"
 
 
+def test_every_category_pattern_resolves_to_its_own_category():
+    """Each category's own patterns must classify as that category, not get shadowed
+    by an earlier category in SAFE_HARBOR_PATTERNS' iteration order."""
+    for category, patterns in phi.SAFE_HARBOR_PATTERNS.items():
+        for pattern in patterns:
+            with pytest.raises(AssertionError, match=category):
+                phi.assert_no_phi("some_table", {"patient_key", pattern})
+
+
 @pytest.mark.parametrize(
     "category,poisoned_column",
     [
@@ -77,6 +86,8 @@ def test_assert_no_phi_error_names_the_table_and_column():
 # The real current column sets for every silver table (src/vitals/lakehouse.py /
 # src/vitals/backends/databricks_delta.py _silver_statements()). Hard-coded here (not imported)
 # so this test stays hermetic — no DuckDB build or Spark session required.
+# Mirror of REAL_SILVER_COLUMNS in tests/test_databricks_delta.py (set vs list only) — that file's
+# test_real_silver_columns_matches_test_phi fails loudly if the two drift apart.
 REAL_SILVER_COLUMNS = {
     "patient": {"patient_key", "gender", "age", "_date_shift_days"},
     "target": {"patient_key", "surgery_90d"},

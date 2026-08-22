@@ -104,7 +104,7 @@ the whole medallion, no laptop. Verified `TERMINATED SUCCESS` (`bundle deploy &&
 - **Single task by design.** generate/bronze/silver share one Python process + Spark session and hand
   data off in-process → one task; gold (dbt on a SQL warehouse) and drift (pandas, after gold) are
   different runtimes → separate tasks. Task boundaries follow the *runtime*, not the stage name.
-- **In-job gates:** PHI (`assert_no_phi`) + non-empty counts hard-fail the task on-cluster; the dbt
+- **In-job gates:** PHI (`assert_all_silver_no_phi`) + non-empty counts hard-fail the task on-cluster; the dbt
   tests still gate gold. Cross-engine parity stays the dev/connect-time gate (no DuckDB on-cluster).
 - **Three Free-Edition serverless lessons learned the hard way (each surfaced only on a live run):**
   1. **A wheel ships its dependencies.** With the MVP stack (duckdb/dbt/mlflow/…) in `[project]`

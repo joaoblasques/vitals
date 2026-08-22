@@ -41,6 +41,7 @@ def assert_no_phi(table: str, columns: set[str]) -> None:
         for col in sorted(columns):
             col_lower = lowered[col]
             if any(pattern in col_lower for pattern in patterns):
+                # Raised explicitly (not via `assert`) so `python -O` can't silently strip this gate.
                 raise AssertionError(
                     f"PHI leaked into silver.{table}: column '{col}' matches "
                     f"Safe Harbor category '{category}'"

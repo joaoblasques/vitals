@@ -1,5 +1,6 @@
 import pytest
 
+import test_phi
 from vitals.backends import databricks_delta as dx
 
 
@@ -19,6 +20,8 @@ class _FakeSpark:
         return _FakeTable(self._tables[table_name])
 
 
+# Mirror of REAL_SILVER_COLUMNS in tests/test_phi.py (set vs list only — Databricks' .columns
+# API returns a list). test_real_silver_columns_matches_test_phi below fails loudly if they drift.
 REAL_SILVER_COLUMNS = {
     "patient": ["patient_key", "gender", "age", "_date_shift_days"],
     "target": ["patient_key", "surgery_90d"],
@@ -31,6 +34,12 @@ REAL_SILVER_COLUMNS = {
 }
 
 
+def test_real_silver_columns_matches_test_phi():
+    """Guards against tests/test_phi.py and this file's REAL_SILVER_COLUMNS drifting apart."""
+    as_sets = {table: set(cols) for table, cols in REAL_SILVER_COLUMNS.items()}
+    assert as_sets == test_phi.REAL_SILVER_COLUMNS
+
+
 def test_assert_all_silver_no_phi_passes_real_schemas():
     fake_spark = _FakeSpark(REAL_SILVER_COLUMNS)
     dx.assert_all_silver_no_phi(fake_spark)  # must not raise
@@ -40,9 +49,6 @@ def test_assert_all_silver_no_phi_checks_every_table():
     checked = []
     tables = dict(REAL_SILVER_COLUMNS)
     fake_spark = _FakeSpark(tables)
-
-    class _SpyTable(_FakeTable):
-        pass
 
     orig_table = fake_spark.table
 
