@@ -10,7 +10,8 @@ from __future__ import annotations
 # 18 Safe Harbor categories -> lowercase substrings that indicate that category in a column name.
 SAFE_HARBOR_PATTERNS: dict[str, set[str]] = {
     "names": {"name", "patient_name", "first_name", "last_name"},
-    "geographic_subdivisions": {"street", "city", "zip", "postal"},
+    "ip_addresses": {"ip_address", "ip_addr"},
+    "geographic_subdivisions": {"address", "street", "city", "zip", "postal"},
     "dates": {"birthdate", "birth_date", "dob", "admit_date", "discharge_date", "death_date"},
     "telephone_numbers": {"phone", "telephone", "mobile_number"},
     "fax_numbers": {"fax"},
@@ -25,7 +26,6 @@ SAFE_HARBOR_PATTERNS: dict[str, set[str]] = {
     "biometric_identifiers": {"fingerprint", "biometric", "retina", "voiceprint"},
     "full_face_photos": {"photo", "headshot", "face_image"},
     "urls": {"url", "website"},
-    "ip_addresses": {"ip_address", "ip_addr"},
     "other_unique_identifiers": {"identifier", "unique_id"},
 }
 
