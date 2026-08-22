@@ -52,6 +52,8 @@ jobs:
         run: uv sync --extra dev --extra local --extra dq
       - name: Lint (ruff)
         run: uv run ruff check .
+      # Includes tests/test_databricks_delta.py's assert_all_silver_no_phi tests — the Databricks
+      # engine's PHI check is proven here with a fake SparkSession, no live cluster needed (ADR 0011).
       - name: Unit tests (pytest)
         run: uv run pytest -q
       - name: DQ gate — local pipeline (PHI boundary + 26 dbt tests)

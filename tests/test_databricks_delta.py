@@ -67,3 +67,15 @@ def test_assert_all_silver_no_phi_catches_a_leak_without_a_cluster():
 def test_silver_table_columns_reads_any_table():
     fake_spark = _FakeSpark(REAL_SILVER_COLUMNS)
     assert dx.silver_table_columns(fake_spark, "condition") == REAL_SILVER_COLUMNS["condition"]
+
+
+def test_module_imports_without_a_live_workspace():
+    """Importing databricks_delta must not require databricks.connect/sdk — only calling _spark()
+    or _upload_landing() does (they lazy-import). This is what lets assert_all_silver_no_phi run
+    hermetically in CI without a cluster."""
+    import importlib
+
+    from vitals.backends import databricks_delta
+
+    importlib.reload(databricks_delta)  # re-exercise the module-level import path
+    assert hasattr(databricks_delta, "assert_all_silver_no_phi")
