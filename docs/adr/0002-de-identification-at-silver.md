@@ -43,3 +43,7 @@ non-secret salt — it exercises the de-id *logic*, not the secrecy of the value
   all engines despite this ADR; added `vitals.salt` (env/`.env` → shared secret), salted every
   `patient_key` and the date shift on all four engine paths, and wired `make setup` / `.env.example` /
   CI. Verified: keys changed from the old un-salted output and every cross-table join still resolves.
+- 2026-07-23 — **coverage broadened.** The PHI-column assertion this ADR established was duplicated
+  across engines, covered ~5 of 18 Safe Harbor categories, and checked only `silver.patient`. See
+  ADR 0011 — one shared 18-category check (`vitals.phi`), applied to all 8 silver tables, on both
+  engines, CI-verified.

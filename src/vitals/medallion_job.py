@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> None:
     generate.generate()
     bronze = dx.land_bronze()                       # upload to volume + write Delta
     silver = dx.build_silver()                      # bronze Delta -> de-identified silver Delta
-    dx.assert_no_phi(dx.silver_patient_columns())   # PHI boundary — hard gate
+    dx.assert_all_silver_no_phi(dx._spark())        # PHI boundary — hard gate, all 8 silver tables
     _assert_nonempty(bronze, silver)                # non-empty — hard gate
     print(f"✅ medallion ingest complete: bronze={sum(bronze.values())} silver={sum(silver.values())}")
 

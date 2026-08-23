@@ -13,7 +13,7 @@ from pathlib import Path
 
 import duckdb
 
-from vitals import salt
+from vitals import phi, salt
 from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -168,16 +168,17 @@ def build() -> dict:
     report = {"bronze_before": dq_before, "silver_after": dq_after}
     DQ_OUT.write_text(json.dumps(report, indent=2))
 
-    # de-id assertion: silver.patient must carry no PHI columns
-    cols = {c[0] for c in con.execute("DESCRIBE silver.patient").fetchall()}
-    assert not (cols & {"name", "identifier", "address", "birthDate"}), f"PHI leaked into silver: {cols}"
+    # de-id assertion: no silver table may carry a Safe Harbor PHI-pattern column (ADR 0002, ADR 0011)
+    silver_tables = [r[0] for r in con.execute(
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='silver' ORDER BY 1"
+    ).fetchall()]
+    for table in silver_tables:
+        cols = {c[0] for c in con.execute(f"DESCRIBE silver.{table}").fetchall()}
+        phi.assert_no_phi(table, cols)
 
     # Per-table silver row counts -> baseline file, so other backends (Delta-on-UC) can verify
     # row-count parity without needing DuckDB. Regenerated every build, so it tracks the data.
-    tables = [r[0] for r in con.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema='silver' ORDER BY 1"
-    ).fetchall()]
-    baseline = {t: _scalar(con, f"SELECT count(*) FROM silver.{t}") for t in tables}
+    baseline = {t: _scalar(con, f"SELECT count(*) FROM silver.{t}") for t in silver_tables}
     SILVER_BASELINE.write_text(json.dumps(baseline, indent=2))
 
     print("silver built. DQ report:", json.dumps(report, indent=2))

@@ -18,7 +18,7 @@ import json
 import sys
 from pathlib import Path
 
-from vitals import env, salt
+from vitals import env, phi, salt
 from vitals.vocab import ICD_DISPLAY, MMOL_TO_MGDL, TEXT_TO_ICD
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -41,8 +41,6 @@ SILVER_SCHEMA = "clinical"
 SILVER_TABLES = [
     "patient", "target", "observation", "condition", "note", "claim", "pro", "wearable_daily",
 ]
-# Columns that must NEVER appear in silver.patient (HIPAA Safe Harbor identifiers).
-PHI_COLUMNS = {"name", "identifier", "address", "birthDate", "ssn"}
 
 # Gold: built by dbt (`dbt build --target databricks`) into vitals_gold.marts. Parity is checked
 # against a baseline of the local DuckDB gold (written by `gold-baseline`).
@@ -239,15 +237,17 @@ def build_silver() -> dict[str, int]:
     return counts
 
 
-def silver_patient_columns() -> list[str]:
-    return _spark().table(f"{SILVER_CATALOG}.{SILVER_SCHEMA}.patient").columns
+def silver_table_columns(spark, table: str) -> list[str]:
+    return spark.table(f"{SILVER_CATALOG}.{SILVER_SCHEMA}.{table}").columns
 
 
-def assert_no_phi(columns: list[str]) -> None:
-    """The project's signature check: no HIPAA identifiers survive into silver.patient."""
-    leaked = set(columns) & PHI_COLUMNS
-    if leaked:
-        raise AssertionError(f"PHI leaked into silver.patient: {sorted(leaked)}")
+def assert_all_silver_no_phi(spark) -> None:
+    """The project's signature check, generalized: no HIPAA identifier survives into ANY silver
+    table (ADR 0002, ADR 0011). Uses the shared vitals.phi module so this engine's check can never
+    drift from the DuckDB engine's again."""
+    for table in SILVER_TABLES:
+        cols = set(silver_table_columns(spark, table))
+        phi.assert_no_phi(table, cols)
 
 
 def silver_baseline() -> dict[str, int]:
@@ -311,9 +311,8 @@ def main_bronze() -> None:
 def main_silver() -> None:
     print(f"[silver->delta] building {len(SILVER_TABLES)} tables in {SILVER_CATALOG}.{SILVER_SCHEMA} ...")
     remote = build_silver()
-    cols = silver_patient_columns()
-    assert_no_phi(cols)  # PHI boundary — fail hard before reporting parity
-    print(f"  PHI boundary OK — silver.patient columns: {cols}")
+    assert_all_silver_no_phi(_spark())  # PHI boundary — fail hard before reporting parity, all 8 tables
+    print(f"  PHI boundary OK — all {len(SILVER_TABLES)} silver tables checked")
     ok = _print_parity("table", parity_report(silver_baseline(), remote))
     print(f"\n{'✅ silver parity: all tables match local DuckDB' if ok else '❌ silver parity FAILED'}")
     if not ok:

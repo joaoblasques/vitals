@@ -39,18 +39,7 @@ def test_sources_cover_the_eight_bronze_entities():
     }
 
 
-# ---- silver: PHI boundary + transform contract ------------------------------------------------
-
-def test_assert_no_phi_passes_for_deidentified_columns():
-    dd.assert_no_phi(["patient_key", "gender", "age", "_date_shift_days"])  # must not raise
-
-
-def test_assert_no_phi_raises_when_identifier_leaks():
-    import pytest
-    for leak in ("name", "identifier", "address", "birthDate", "ssn"):
-        with pytest.raises(AssertionError):
-            dd.assert_no_phi(["patient_key", leak])
-
+# ---- silver: transform contract (PHI boundary itself is tested in test_databricks_delta.py) ---
 
 def test_silver_statements_build_all_tables_patient_first():
     stmts = dd._silver_statements()

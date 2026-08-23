@@ -25,8 +25,8 @@ def test_main_sets_env_and_runs_stages_in_order(monkeypatch):
     import vitals.backends.databricks_delta as dx
     monkeypatch.setattr(dx, "land_bronze", lambda: (calls.append("land_bronze") or {"patients": 5}))
     monkeypatch.setattr(dx, "build_silver", lambda: (calls.append("build_silver") or {"patient": 5}))
-    monkeypatch.setattr(dx, "silver_patient_columns", lambda: (calls.append("cols") or ["patient_key"]))
-    monkeypatch.setattr(dx, "assert_no_phi", lambda cols: calls.append("assert_no_phi"))
+    monkeypatch.setattr(dx, "_spark", lambda: calls.append("_spark") or "fake-spark")
+    monkeypatch.setattr(dx, "assert_all_silver_no_phi", lambda spark: calls.append("assert_all_silver_no_phi"))
     monkeypatch.setattr(medallion_job, "_assert_nonempty", lambda b, s: calls.append("_assert_nonempty"))
 
     import os
@@ -37,5 +37,6 @@ def test_main_sets_env_and_runs_stages_in_order(monkeypatch):
     assert os.environ["VITALS_BRONZE_DIR"] == "/tmp/vitals_bronze"
     assert os.environ["VITALS_SPARK_MODE"] == "ambient"
     assert calls == [
-        "generate", "land_bronze", "build_silver", "cols", "assert_no_phi", "_assert_nonempty",
+        "generate", "land_bronze", "build_silver", "_spark", "assert_all_silver_no_phi",
+        "_assert_nonempty",
     ]
