@@ -1,5 +1,7 @@
 # CLAUDE.md — vitals
 
+status: priority
+
 Project context for any AI coding session. Keep it tight; this is read every session.
 
 ## What this is
