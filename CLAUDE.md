@@ -13,7 +13,7 @@ Stakeholder: health-tech analytics + ML. See `README.md`. Site: https://joaoblas
 
 ## Working model (one session, root here to build)
 Vitals is worked as **one session per project, rooted at its center of gravity** — root in THIS
-repo (`~/Dev/vitals`) to build; root in the vault (`~/Dev/AIOS/10_Projects/Vitals/`) for
+repo (`~/Dev/vitals`) to build; root in the vault (`~/2ndBrain/10_Projects/Vitals/`) for
 planning/notes. Whichever root you're in, target the OTHER explicitly (absolute paths, `git -C`).
 Global discipline: `~/.claude/CLAUDE.md`. Project tracking + decisions live in the vault brain.
 - **Concurrent-writer protocol** (see global `~/.claude/CLAUDE.md`): pull-rebase-autostash first,
