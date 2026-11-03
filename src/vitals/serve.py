@@ -155,8 +155,8 @@ def _rag_demo(notes: pd.DataFrame, queries: list[str]) -> dict:
 
 def _train_model(feats: pd.DataFrame) -> dict:
     from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import roc_auc_score, accuracy_score
-    from sklearn.model_selection import train_test_split
+    from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score, confusion_matrix
+    from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
     from sklearn.pipeline import Pipeline
     from sklearn.impute import SimpleImputer
     from sklearn.preprocessing import StandardScaler
@@ -178,6 +178,12 @@ def _train_model(feats: pd.DataFrame) -> dict:
     proba = pipe.predict_proba(Xte)[:, 1]
     auc = roc_auc_score(yte, proba)
     acc = accuracy_score(yte, pipe.predict(Xte))
+    # One 150-row split is a point value with wide error; 5-fold CV gives the spread.
+    # Precision/recall at a stated threshold (0.5) show what the AUC hides.
+    thr = 0.5
+    pred = (proba >= thr).astype(int)
+    tn, fp, fn, tp = confusion_matrix(yte, pred, labels=[0, 1]).ravel()
+    cv = cross_val_score(pipe, X, y, cv=StratifiedKFold(5, shuffle=True, random_state=42), scoring="roc_auc")
     coefs = dict(zip(feat_cols, np.round(pipe.named_steps["clf"].coef_.ravel(), 3).tolist()))
 
     # MLflow tracking (local file store)
@@ -197,6 +203,11 @@ def _train_model(feats: pd.DataFrame) -> dict:
         "model": "LogisticRegression",
         "n_train": int(len(Xtr)), "n_test": int(len(Xte)),
         "roc_auc": round(float(auc), 3), "accuracy": round(float(acc), 3),
+        "cv_roc_auc_mean": round(float(cv.mean()), 3), "cv_roc_auc_std": round(float(cv.std()), 3),
+        "threshold": thr,
+        "precision": round(float(precision_score(yte, pred, zero_division=0)), 3),
+        "recall": round(float(recall_score(yte, pred, zero_division=0)), 3),
+        "confusion_matrix": {"tn": int(tn), "fp": int(fp), "fn": int(fn), "tp": int(tp)},
         "positive_rate": round(float(y.mean()), 3),
         "top_coefficients": coefs,
         "mlflow_tracked": tracked,
